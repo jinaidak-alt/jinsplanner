@@ -1991,17 +1991,38 @@ function playNotificationSound() {
   } catch(e) {}
 }
 
-// 알림 발송
+// 알림 발송 — SW가 활성화된 환경은 showNotification() 사용 (Chrome 권장)
 function sendNotification(title, body) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  console.log('[알림] sendNotification 호출 — 권한:', Notification.permission, '| 제목:', title);
+  if (!('Notification' in window)) { console.warn('[알림] 이 브라우저는 알림을 지원하지 않습니다.'); return; }
+  if (Notification.permission !== 'granted') { console.warn('[알림] 권한 없음 — 발송 취소 (현재 상태:', Notification.permission + ')'); return; }
   playNotificationSound();
-  new Notification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      // Service Worker 활성화 상태: showNotification() 사용
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+        console.log('[알림] SW showNotification 전송 완료');
+      }).catch(err => {
+        console.warn('[알림] SW showNotification 실패, Notification() 폴백:', err);
+        new Notification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+      });
+    } else {
+      new Notification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+      console.log('[알림] new Notification() 전송 완료');
+    }
+  } catch(e) {
+    console.error('[알림] Notification 생성 실패:', e);
+  }
 }
 
-// 작업 1: 알림 권한 요청
-function requestNotifPermission() {
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+// 작업 1: 알림 권한 요청 (비동기 처리)
+async function requestNotifPermission() {
+  if (!('Notification' in window)) { console.warn('[알림] 브라우저 알림 미지원'); return; }
+  console.log('[알림] 현재 권한 상태:', Notification.permission);
+  if (Notification.permission === 'default') {
+    const result = await Notification.requestPermission();
+    console.log('[알림] 권한 요청 결과:', result);
   }
 }
 
@@ -2015,6 +2036,8 @@ function scheduleDailySummary() {
   const target = new Date();
   target.setHours(h, m, 0, 0);
   if (target <= now) target.setDate(target.getDate() + 1);
+  const diff = target - now;
+  console.log(`[알림] 하루 요약 알림 예약 — ${settings.dailyTime || '09:00'} (약 ${Math.round(diff / 60000)}분 후)`);
   _dailySummaryTimer = setTimeout(() => {
     const today = todayStr();
     const rs = routinesForDate(today);
@@ -2022,7 +2045,7 @@ function scheduleDailySummary() {
     const total = rs.length + dayTasks.length;
     sendNotification('오늘도, 한 걸음 🌱', `오늘 ${total}개의 작은 성취가 기다려요 🌱`);
     scheduleDailySummary();
-  }, target - now);
+  }, diff);
 }
 
 // 작업 3: 할 일 시작 알림 스케줄러
@@ -2032,14 +2055,19 @@ function scheduleTaskNotifications() {
   Object.keys(_taskNotifTimers).forEach(k => delete _taskNotifTimers[k]);
   const today = todayStr();
   const now = new Date();
-  getTasks().filter(t => t.dueDate === today && !t.done && t.time && t.time.start).forEach(t => {
+  const targets = getTasks().filter(t => t.dueDate === today && !t.done && t.time && t.time.start);
+  console.log(`[알림] 할 일 시작 알림 등록 대상: ${targets.length}개`);
+  targets.forEach(t => {
     const [h, m] = t.time.start.split(':').map(Number);
     const target = new Date(); target.setHours(h, m, 0, 0);
     const diff = target - now;
     if (diff > 0) {
+      console.log(`[알림] "${t.text}" 알림 등록 — ${t.time.start} (약 ${Math.round(diff / 60000)}분 후)`);
       _taskNotifTimers[t.id] = setTimeout(() => {
         sendNotification('오늘도, 한 걸음 🌅', `${t.text} 시작할 시간이에요!`);
       }, diff);
+    } else {
+      console.log(`[알림] "${t.text}" — 이미 지난 시간(${t.time.start}), 건너뜀`);
     }
   });
 }
