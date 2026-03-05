@@ -511,8 +511,11 @@
     <!-- ── Task-specific fields (단발 태스크) ── -->
     <div id="panel-task-fields" style="display:none">
       <div class="form-group">
-        <label class="form-label">마감일</label>
-        <input class="form-input" id="add-due-date" type="date" placeholder="선택사항"/>
+        <label class="form-label">날짜 <span style="font-weight:400;color:#9ca3af">(선택)</span></label>
+        <div class="form-row">
+          <input class="form-input" id="add-task-start-date" type="date" placeholder="시작일"/>
+          <input class="form-input" id="add-due-date"        type="date" placeholder="마감일 (선택)"/>
+        </div>
       </div>
     </div>
 
@@ -747,7 +750,7 @@ const catById = id => getCats().find(c=>c.id===id) || {name:'기타',color:'#6b7
 
 function achievement(ds) {
   const rs       = routinesForDate(ds);
-  const dayTasks = getTasks().filter(t => t.dueDate === ds);
+  const dayTasks = getTasks().filter(t => (t.startDate || t.dueDate) === ds);
   const total    = rs.length + dayTasks.length;
   if (!total) return null;
   const ck = getChecks(ds);
@@ -950,7 +953,7 @@ function renderDaily() {
   document.getElementById('daily-date-sub').textContent   = isToday?'오늘':'';
 
   const rs=routinesForDate(ds), ck=getChecks(ds);
-  const dayTasks=getTasks().filter(t=>t.dueDate===ds);
+  const dayTasks=getTasks().filter(t=>(t.startDate||t.dueDate)===ds);
   const done=rs.filter(r=>ck[r.id]).length + dayTasks.filter(t=>t.done).length;
   const total=rs.length + dayTasks.length;
   const pct=total?Math.round(done/total*100):0;
@@ -999,7 +1002,7 @@ function renderWeekly() {
     const isToday = ds===today;
     const rs       = routinesForDate(ds);
     const ck       = getChecks(ds);
-    const dayTasks = getTasks().filter(t => t.dueDate === ds);
+    const dayTasks = getTasks().filter(t => (t.startDate || t.dueDate) === ds);
     const done     = rs.filter(r=>ck[r.id]).length + dayTasks.filter(t=>t.done).length;
     const total    = rs.length + dayTasks.length;
     const pct      = total?Math.round(done/total*100):0;
@@ -1315,10 +1318,12 @@ function renderProject() {
 
       catTasks.sort((a, b) => {
         if (a.done !== b.done) return a.done ? 1 : -1;
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return a.dueDate.localeCompare(b.dueDate);
+        const aDate = a.dueDate || a.startDate;
+        const bDate = b.dueDate || b.startDate;
+        if (!aDate && !bDate) return 0;
+        if (!aDate) return 1;
+        if (!bDate) return -1;
+        return aDate.localeCompare(bDate);
       });
 
       catTasks.forEach(t => {
@@ -1348,6 +1353,7 @@ function renderProject() {
 function openAddModal() {
   editId=null; editTaskId=null; addTaskSlot=null;
   document.getElementById('modal-add-title').textContent='할 일 추가';
+  document.getElementById('add-task-start-date').value=todayStr();
   document.getElementById('add-due-date').value='';
   document.getElementById('add-text').value='';
   document.getElementById('add-time-start').value='';
@@ -1709,8 +1715,9 @@ function setTimeMode(slot) {
 }
 
 function submitTask() {
-  const text    = document.getElementById('add-text').value.trim();
-  const dueDate = document.getElementById('add-due-date').value || '';
+  const text      = document.getElementById('add-text').value.trim();
+  const startDate = document.getElementById('add-task-start-date').value || todayStr();
+  const dueDate   = document.getElementById('add-due-date').value || '';
   if (!text) { alert('할 일 이름을 입력해 주세요.'); return; }
 
   const tasks = getTasks();
@@ -1719,6 +1726,7 @@ function submitTask() {
     id:         editTaskId || Date.now().toString(),
     text,
     categoryId: addCatId || getCats()[0]?.id,
+    startDate,
     dueDate,
     timeSlot:   timeInputActive ? null : addTaskSlot,
     time:       timeInputActive ? {
@@ -1764,7 +1772,8 @@ function openEditTaskModal(id) {
   document.getElementById('add-delete').style.display    = 'block';
   addCatId    = t.categoryId;
   addTaskSlot = t.timeSlot || null;
-  document.getElementById('add-due-date').value = t.dueDate || '';
+  document.getElementById('add-task-start-date').value = t.startDate || todayStr();
+  document.getElementById('add-due-date').value         = t.dueDate  || '';
   // 시간 설정 복원
   document.querySelectorAll('.timeslot-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('panel-time-input').style.display = 'none';
@@ -1823,7 +1832,7 @@ function buildTaskItem(t) {
 }
 
 function renderDailyTasks(ds) {
-  const tasks   = getTasks().filter(t => t.dueDate === ds);
+  const tasks   = getTasks().filter(t => (t.startDate || t.dueDate) === ds);
   const section = document.getElementById('daily-tasks-section');
   const listEl  = document.getElementById('daily-tasks-list');
 
@@ -2041,7 +2050,7 @@ function scheduleDailySummary() {
   _dailySummaryTimer = setTimeout(() => {
     const today = todayStr();
     const rs = routinesForDate(today);
-    const dayTasks = getTasks().filter(t => t.dueDate === today);
+    const dayTasks = getTasks().filter(t => (t.startDate || t.dueDate) === today);
     const total = rs.length + dayTasks.length;
     sendNotification('오늘도, 한 걸음 🌱', `오늘 ${total}개의 작은 성취가 기다려요 🌱`);
     scheduleDailySummary();
@@ -2055,7 +2064,7 @@ function scheduleTaskNotifications() {
   Object.keys(_taskNotifTimers).forEach(k => delete _taskNotifTimers[k]);
   const today = todayStr();
   const now = new Date();
-  const targets = getTasks().filter(t => t.dueDate === today && !t.done && t.time && t.time.start);
+  const targets = getTasks().filter(t => (t.startDate || t.dueDate) === today && !t.done && t.time && t.time.start);
   console.log(`[알림] 할 일 시작 알림 등록 대상: ${targets.length}개`);
   targets.forEach(t => {
     const [h, m] = t.time.start.split(':').map(Number);
