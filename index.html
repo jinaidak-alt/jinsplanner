@@ -956,8 +956,8 @@ function renderDaily() {
 
   const listEl=document.getElementById('daily-list');
   listEl.innerHTML='';
-  if (!rs.length) { listEl.innerHTML='<div class="empty">이 날의 할 일이 없습니다.<br>+ 버튼으로 추가해 보세요.</div>'; return; }
-  rs.forEach(r => listEl.appendChild(buildRoutineItem(r,ds)));
+  if (!rs.length) { listEl.innerHTML='<div class="empty">이 날의 할 일이 없습니다.<br>+ 버튼으로 추가해 보세요.</div>'; }
+  else { rs.forEach(r => listEl.appendChild(buildRoutineItem(r,ds))); }
   renderDailyTasks(ds);
 }
 
