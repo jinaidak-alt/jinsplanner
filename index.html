@@ -1949,6 +1949,23 @@ document.querySelectorAll('.timeslot-btn').forEach(b => {
 if (!localStorage.getItem('cats')) saveCats(DEFAULT_CATS);
 renderCurrent();
 </script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAKOU49vWsJILNQzutNsfmA8Jzs_nuLYog",
+    authDomain: "jinsplanner.firebaseapp.com",
+    projectId: "jinsplanner",
+    storageBucket: "jinsplanner.firebasestorage.app",
+    messagingSenderId: "958045716171",
+    appId: "1:958045716171:web:f2a1e11facb9b3511e254e",
+    measurementId: "G-PX251D2R59"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
