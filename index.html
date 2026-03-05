@@ -2008,8 +2008,11 @@ renderCurrent();
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.appData) {
-          localStorage.setItem('plannerData', data.appData);
-          location.reload();
+          const parsed = JSON.parse(data.appData);
+          ['cats','routines','checks','notes','tasks','skips'].forEach(key => {
+            if (parsed[key]) localStorage.setItem(key, parsed[key]);
+          });
+          if (window.renderCurrent) renderCurrent();
         }
       }
     } else {
@@ -2024,7 +2027,14 @@ renderCurrent();
   window.saveToCloud = async () => {
     const user = auth.currentUser;
     if (!user) return;
-    const appData = localStorage.getItem('plannerData');
+    const appData = JSON.stringify({
+      cats:     localStorage.getItem('cats'),
+      routines: localStorage.getItem('routines'),
+      checks:   localStorage.getItem('checks'),
+      notes:    localStorage.getItem('notes'),
+      tasks:    localStorage.getItem('tasks'),
+      skips:    localStorage.getItem('skips'),
+    });
     await setDoc(doc(db, 'users', user.uid), { appData });
   };
 </script>
