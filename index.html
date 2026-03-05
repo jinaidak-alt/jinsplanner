@@ -291,6 +291,11 @@
   </style>
 </head>
 <body>
+<div id="auth-bar" style="display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px 16px; background:#f3f4f6;">
+  <span id="user-info" style="font-size:13px; color:#6366f1;"></span>
+  <button id="login-btn" onclick="googleLogin()" style="background:#6366f1; color:white; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer;">구글 로그인</button>
+  <button id="logout-btn" onclick="googleLogout()" style="display:none; background:#e5e7eb; color:#374151; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer;">로그아웃</button>
+</div>
 <div class="app">
 
   <!-- App header -->
@@ -647,9 +652,9 @@ let editTaskId  = null;
 // Storage
 // ─────────────────────────────────────────
 const getCats     = () => { const s=localStorage.getItem('cats');     return s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT_CATS)); };
-const saveCats    = c  => localStorage.setItem('cats', JSON.stringify(c));
+const saveCats    = c  => { localStorage.setItem('cats', JSON.stringify(c)); if (window.saveToCloud) saveToCloud(); };
 const getRoutines = () => JSON.parse(localStorage.getItem('routines') || '[]');
-const saveRoutines= r  => localStorage.setItem('routines', JSON.stringify(r));
+const saveRoutines= r  => { localStorage.setItem('routines', JSON.stringify(r)); if (window.saveToCloud) saveToCloud(); };
 const getAllChecks = () => JSON.parse(localStorage.getItem('checks')   || '{}');
 const getChecks   = ds => getAllChecks()[ds] || {};
 function saveChecks(ds, obj) {
@@ -658,6 +663,7 @@ function saveChecks(ds, obj) {
   const keys = Object.keys(all).sort();
   if (keys.length > 120) keys.slice(0, keys.length-120).forEach(k=>delete all[k]);
   localStorage.setItem('checks', JSON.stringify(all));
+  if (window.saveToCloud) saveToCloud();
 }
 
 // Notes storage (날짜별 한마디)
@@ -667,13 +673,14 @@ function saveNoteFor(ds, text) {
   const all = getAllNotes();
   if (text.trim()) all[ds] = text.trim(); else delete all[ds];
   localStorage.setItem('notes', JSON.stringify(all));
+  if (window.saveToCloud) saveToCloud();
 }
 
 // Tasks storage (단발 태스크)
 const getTasks  = () => JSON.parse(localStorage.getItem('tasks') || '[]');
-const saveTasks = t  => localStorage.setItem('tasks', JSON.stringify(t));
+const saveTasks = t  => { localStorage.setItem('tasks', JSON.stringify(t)); if (window.saveToCloud) saveToCloud(); };
 const getSkips  = () => JSON.parse(localStorage.getItem('skips') || '{}');
-const saveSkips = s  => localStorage.setItem('skips', JSON.stringify(s));
+const saveSkips = s  => { localStorage.setItem('skips', JSON.stringify(s)); if (window.saveToCloud) saveToCloud(); };
 
 // ─────────────────────────────────────────
 // Date helpers
@@ -1951,7 +1958,8 @@ renderCurrent();
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAKOU49vWsJILNQzutNsfmA8Jzs_nuLYog",
@@ -1964,7 +1972,61 @@ renderCurrent();
   };
 
   const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  // 로그인 함수
+  window.googleLogin = async () => {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 로그아웃 함수
+  window.googleLogout = async () => {
+    await signOut(auth);
+  };
+
+  // 로그인 상태 감지
+  onAuthStateChanged(auth, async (user) => {
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userInfo = document.getElementById('user-info');
+
+    if (user) {
+      // 로그인 상태
+      if (loginBtn) loginBtn.style.display = 'none';
+      if (logoutBtn) logoutBtn.style.display = 'block';
+      if (userInfo) userInfo.textContent = user.displayName + '님';
+
+      // Firestore에서 데이터 불러오기
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.appData) {
+          localStorage.setItem('plannerData', data.appData);
+          location.reload();
+        }
+      }
+    } else {
+      // 로그아웃 상태
+      if (loginBtn) loginBtn.style.display = 'block';
+      if (logoutBtn) logoutBtn.style.display = 'none';
+      if (userInfo) userInfo.textContent = '';
+    }
+  });
+
+  // 데이터 저장 함수 (Firestore)
+  window.saveToCloud = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const appData = localStorage.getItem('plannerData');
+    await setDoc(doc(db, 'users', user.uid), { appData });
+  };
 </script>
 <script>
   if ('serviceWorker' in navigator) {
