@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <!-- PWA -->
+  <link rel="manifest" href="/jinsplanner/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="한걸음">
+  <link rel="apple-touch-icon" href="/jinsplanner/icons/icon-192.png">
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>데일리 할 일</title>
@@ -1941,6 +1948,16 @@ document.querySelectorAll('.timeslot-btn').forEach(b => {
 // ─────────────────────────────────────────
 if (!localStorage.getItem('cats')) saveCats(DEFAULT_CATS);
 renderCurrent();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/jinsplanner/sw.js')
+        .then((reg) => console.log('[SW] 등록 성공:', reg.scope))
+        .catch((err) => console.error('[SW] 등록 실패:', err));
+    });
+  }
 </script>
 </body>
 </html>
