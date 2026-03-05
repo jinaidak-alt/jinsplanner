@@ -528,6 +528,14 @@
     <div class="modal-title">카테고리 관리</div>
     <div id="manage-categories"></div>
     <button class="btn-secondary" id="manage-close" style="margin-top:16px">닫기</button>
+    <!-- 알림 설정 -->
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+      <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:12px;">알림 설정 🔔</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;">
+        <label for="notif-daily-time" style="font-size:14px;color:#374151;">하루 요약 알림 시간</label>
+        <input type="time" id="notif-daily-time" style="padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;color:#374151;cursor:pointer;outline:none;">
+      </div>
+    </div>
     <!-- 위험 구역 -->
     <div style="margin-top:24px;padding-top:16px;border-top:2px solid #fee2e2;">
       <div style="font-size:13px;font-weight:700;color:#ef4444;margin-bottom:10px;">⚠️ 위험 구역</div>
@@ -678,9 +686,13 @@ function saveNoteFor(ds, text) {
 
 // Tasks storage (단발 태스크)
 const getTasks  = () => JSON.parse(localStorage.getItem('tasks') || '[]');
-const saveTasks = t  => { localStorage.setItem('tasks', JSON.stringify(t)); if (window.saveToCloud) saveToCloud(); };
+const saveTasks = t  => { localStorage.setItem('tasks', JSON.stringify(t)); if (window.saveToCloud) saveToCloud(); scheduleTaskNotifications(); };
 const getSkips  = () => JSON.parse(localStorage.getItem('skips') || '{}');
 const saveSkips = s  => { localStorage.setItem('skips', JSON.stringify(s)); if (window.saveToCloud) saveToCloud(); };
+
+// Notification settings storage
+const getNotifSettings  = () => JSON.parse(localStorage.getItem('notifSettings') || '{"dailyTime":"09:00"}');
+const saveNotifSettings = s  => { localStorage.setItem('notifSettings', JSON.stringify(s)); if (window.saveToCloud) saveToCloud(); };
 
 // ─────────────────────────────────────────
 // Date helpers
@@ -1501,6 +1513,7 @@ function skipForDay(ds, routineId) {
 // ─────────────────────────────────────────
 function openManageModal() {
   renderManageCategories();
+  document.getElementById('notif-daily-time').value = getNotifSettings().dailyTime || '09:00';
   document.getElementById('modal-manage').classList.add('open');
 }
 function closeManageModal(){ document.getElementById('modal-manage').classList.remove('open'); }
@@ -1923,6 +1936,12 @@ document.getElementById('add-cancel').onclick = closeAddModal;
 document.getElementById('add-delete').onclick = deleteCurrentRoutine;
 
 document.getElementById('manage-close').onclick = closeManageModal;
+document.getElementById('notif-daily-time').addEventListener('change', e => {
+  const s = getNotifSettings();
+  s.dailyTime = e.target.value;
+  saveNotifSettings(s);
+  scheduleDailySummary();
+});
 
 // 위험 구역
 document.getElementById('btn-clear-checks').onclick = () => {
@@ -1951,10 +1970,88 @@ document.querySelectorAll('.timeslot-btn').forEach(b => {
 });
 
 // ─────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────
+
+// 작업 5: Web Audio API 알림음
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc1.connect(gain); osc2.connect(gain);
+    gain.connect(ctx.destination);
+    osc1.type = 'sine'; osc1.frequency.setValueAtTime(880, ctx.currentTime);
+    osc2.type = 'sine'; osc2.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc1.start(ctx.currentTime); osc1.stop(ctx.currentTime + 0.2);
+    osc2.start(ctx.currentTime + 0.15); osc2.stop(ctx.currentTime + 0.6);
+  } catch(e) {}
+}
+
+// 알림 발송
+function sendNotification(title, body) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  playNotificationSound();
+  new Notification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+}
+
+// 작업 1: 알림 권한 요청
+function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+// 작업 2: 하루 요약 알림 스케줄러
+let _dailySummaryTimer = null;
+function scheduleDailySummary() {
+  if (_dailySummaryTimer) clearTimeout(_dailySummaryTimer);
+  const settings = getNotifSettings();
+  const [h, m] = (settings.dailyTime || '09:00').split(':').map(Number);
+  const now = new Date();
+  const target = new Date();
+  target.setHours(h, m, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  _dailySummaryTimer = setTimeout(() => {
+    const today = todayStr();
+    const rs = routinesForDate(today);
+    const dayTasks = getTasks().filter(t => t.dueDate === today);
+    const total = rs.length + dayTasks.length;
+    sendNotification('오늘도, 한 걸음 🌱', `오늘 ${total}개의 작은 성취가 기다려요 🌱`);
+    scheduleDailySummary();
+  }, target - now);
+}
+
+// 작업 3: 할 일 시작 알림 스케줄러
+const _taskNotifTimers = {};
+function scheduleTaskNotifications() {
+  Object.values(_taskNotifTimers).forEach(id => clearTimeout(id));
+  Object.keys(_taskNotifTimers).forEach(k => delete _taskNotifTimers[k]);
+  const today = todayStr();
+  const now = new Date();
+  getTasks().filter(t => t.dueDate === today && !t.done && t.time && t.time.start).forEach(t => {
+    const [h, m] = t.time.start.split(':').map(Number);
+    const target = new Date(); target.setHours(h, m, 0, 0);
+    const diff = target - now;
+    if (diff > 0) {
+      _taskNotifTimers[t.id] = setTimeout(() => {
+        sendNotification('오늘도, 한 걸음 🌅', `${t.text} 시작할 시간이에요!`);
+      }, diff);
+    }
+  });
+}
+
+// ─────────────────────────────────────────
 // Init
 // ─────────────────────────────────────────
 if (!localStorage.getItem('cats')) saveCats(DEFAULT_CATS);
 renderCurrent();
+requestNotifPermission();
+scheduleDailySummary();
+scheduleTaskNotifications();
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
@@ -2009,7 +2106,7 @@ renderCurrent();
         const data = docSnap.data();
         if (data.appData) {
           const parsed = JSON.parse(data.appData);
-          ['cats','routines','checks','notes','tasks','skips'].forEach(key => {
+          ['cats','routines','checks','notes','tasks','skips','notifSettings'].forEach(key => {
             if (parsed[key]) localStorage.setItem(key, parsed[key]);
           });
           if (window.renderCurrent) renderCurrent();
@@ -2028,12 +2125,13 @@ renderCurrent();
     const user = auth.currentUser;
     if (!user) return;
     const appData = JSON.stringify({
-      cats:     localStorage.getItem('cats'),
-      routines: localStorage.getItem('routines'),
-      checks:   localStorage.getItem('checks'),
-      notes:    localStorage.getItem('notes'),
-      tasks:    localStorage.getItem('tasks'),
-      skips:    localStorage.getItem('skips'),
+      cats:          localStorage.getItem('cats'),
+      routines:      localStorage.getItem('routines'),
+      checks:        localStorage.getItem('checks'),
+      notes:         localStorage.getItem('notes'),
+      tasks:         localStorage.getItem('tasks'),
+      skips:         localStorage.getItem('skips'),
+      notifSettings: localStorage.getItem('notifSettings'),
     });
     await setDoc(doc(db, 'users', user.uid), { appData });
   };
