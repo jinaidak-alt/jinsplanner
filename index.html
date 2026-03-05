@@ -35,6 +35,7 @@
     .nav-sub{font-size:12px;color:#6b7280;margin-top:2px;}
     .nav-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .15s;}
     .nav-btn:hover{background:#f3f4f6;}
+    .today-btn{display:none;padding:2px 10px;border:none;border-radius:999px;background:#ede9fe;color:#7c3aed;font-size:11px;font-weight:600;cursor:pointer;}
 
     /* ── Progress ── */
     .progress-bar-bg{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:8px 0 4px;}
@@ -319,7 +320,10 @@
       <div class="nav-row">
         <button class="nav-btn" id="daily-prev">&#9664;</button>
         <div class="nav-center">
-          <div class="nav-label" id="daily-date-label"></div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+            <div class="nav-label" id="daily-date-label"></div>
+            <button class="today-btn" id="daily-today-btn">오늘로</button>
+          </div>
           <div class="nav-sub"  id="daily-date-sub"></div>
         </div>
         <button class="nav-btn" id="daily-next">&#9654;</button>
@@ -367,7 +371,7 @@
     <div class="card" style="margin-bottom:12px">
       <div class="nav-row" style="margin-bottom:10px">
         <button class="nav-btn" id="weekly-prev">&#9664;</button>
-        <div class="nav-center"><div class="nav-label" id="weekly-label"></div></div>
+        <div class="nav-center"><div style="display:flex;align-items:center;justify-content:center;gap:8px;"><div class="nav-label" id="weekly-label"></div><button class="today-btn" id="weekly-today-btn">오늘로</button></div></div>
         <button class="nav-btn" id="weekly-next">&#9654;</button>
       </div>
       <div class="week-summary">
@@ -400,7 +404,7 @@
     <div class="card">
       <div class="nav-row">
         <button class="nav-btn" id="monthly-prev">&#9664;</button>
-        <div class="nav-center"><div class="nav-label" id="monthly-label"></div></div>
+        <div class="nav-center"><div style="display:flex;align-items:center;justify-content:center;gap:8px;"><div class="nav-label" id="monthly-label"></div><button class="today-btn" id="monthly-today-btn">오늘로</button></div></div>
         <button class="nav-btn" id="monthly-next">&#9654;</button>
       </div>
       <div class="big-pct" id="monthly-big-pct">-</div>
@@ -958,6 +962,7 @@ function renderDaily() {
   const isToday = ds===todayStr();
   document.getElementById('daily-date-label').textContent = fmtFull(dailyDate);
   document.getElementById('daily-date-sub').textContent   = isToday?'오늘':'';
+  document.getElementById('daily-today-btn').style.display = isToday ? 'none' : 'inline-block';
 
   const rs=routinesForDate(ds), ck=getChecks(ds);
   const dayTasks=getTasks().filter(t=>(t.startDate||t.dueDate)===ds);
@@ -999,6 +1004,7 @@ function renderWeekly() {
   const s=dates[0], e=dates[6];
   document.getElementById('weekly-label').textContent =
     `${s.getMonth()+1}/${s.getDate()} – ${e.getMonth()+1}/${e.getDate()}`;
+  document.getElementById('weekly-today-btn').style.display = weekOffset !== 0 ? 'inline-block' : 'none';
 
   let totDone=0, totTotal=0;
   const colsEl = document.getElementById('weekly-cols');
@@ -1122,6 +1128,7 @@ function renderMonthly() {
   const tgt=new Date(now.getFullYear(),now.getMonth()+monthOffset,1);
   const y=tgt.getFullYear(), m=tgt.getMonth();
   document.getElementById('monthly-label').textContent=`${y}년 ${m+1}월`;
+  document.getElementById('monthly-today-btn').style.display = monthOffset !== 0 ? 'inline-block' : 'none';
 
   const dates=monthDates(monthOffset), today=todayStr();
   const dateStrs=dates.map(d=>toStr(d));
@@ -1927,6 +1934,11 @@ document.getElementById('weekly-next').onclick=()=>{ weekOffset++;  renderWeekly
 // Monthly nav
 document.getElementById('monthly-prev').onclick=()=>{ monthOffset--; renderMonthly(); };
 document.getElementById('monthly-next').onclick=()=>{ monthOffset++; renderMonthly(); };
+
+// 오늘로 버튼
+document.getElementById('daily-today-btn').onclick=()=>{ dailyDate=new Date(); renderDaily(); };
+document.getElementById('weekly-today-btn').onclick=()=>{ weekOffset=0; renderWeekly(); };
+document.getElementById('monthly-today-btn').onclick=()=>{ monthOffset=0; renderMonthly(); };
 
 // FABs
 document.getElementById('btn-add').onclick    = openAddModal;
