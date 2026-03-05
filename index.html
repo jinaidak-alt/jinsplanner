@@ -2075,11 +2075,20 @@ function scheduleTaskNotifications() {
 // ─────────────────────────────────────────
 // Init
 // ─────────────────────────────────────────
+console.log('[앱] 메인 스크립트 실행 시작');
 if (!localStorage.getItem('cats')) saveCats(DEFAULT_CATS);
 renderCurrent();
-requestNotifPermission();
-scheduleDailySummary();
-scheduleTaskNotifications();
+
+// Firebase 모듈 스크립트에서도 호출할 수 있도록 window에 노출
+window.scheduleDailySummary     = scheduleDailySummary;
+window.scheduleTaskNotifications = scheduleTaskNotifications;
+window.requestNotifPermission   = requestNotifPermission;
+
+requestNotifPermission().then(() => {
+  scheduleDailySummary();
+  scheduleTaskNotifications();
+});
+console.log('[앱] 알림 스케줄러 초기화 완료');
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
@@ -2138,6 +2147,10 @@ scheduleTaskNotifications();
             if (parsed[key]) localStorage.setItem(key, parsed[key]);
           });
           if (window.renderCurrent) renderCurrent();
+          // 클라우드 데이터 로드 후 알림 재스케줄
+          if (window.scheduleDailySummary) window.scheduleDailySummary();
+          if (window.scheduleTaskNotifications) window.scheduleTaskNotifications();
+          console.log('[Firebase] 데이터 로드 후 알림 재스케줄 완료');
         }
       }
     } else {
