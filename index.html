@@ -512,7 +512,7 @@
     <div id="panel-task-fields" style="display:none">
       <div class="form-group">
         <label class="form-label">마감일</label>
-        <input class="form-input" id="add-due-date" type="date"/>
+        <input class="form-input" id="add-due-date" type="date" placeholder="선택사항"/>
       </div>
     </div>
 
@@ -1348,7 +1348,7 @@ function renderProject() {
 function openAddModal() {
   editId=null; editTaskId=null; addTaskSlot=null;
   document.getElementById('modal-add-title').textContent='할 일 추가';
-  document.getElementById('add-due-date').value=todayStr();
+  document.getElementById('add-due-date').value='';
   document.getElementById('add-text').value='';
   document.getElementById('add-time-start').value='';
   document.getElementById('add-time-end').value='';
@@ -1710,7 +1710,7 @@ function setTimeMode(slot) {
 
 function submitTask() {
   const text    = document.getElementById('add-text').value.trim();
-  const dueDate = document.getElementById('add-due-date').value || todayStr();
+  const dueDate = document.getElementById('add-due-date').value || '';
   if (!text) { alert('할 일 이름을 입력해 주세요.'); return; }
 
   const tasks = getTasks();
