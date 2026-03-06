@@ -1164,8 +1164,16 @@ function addDragDrop(containerEl, saveFn) {
 function renderDaily() {
   const ds      = toStr(dailyDate);
   const isToday = ds===todayStr();
-  document.getElementById('daily-date-label').textContent = fmtFull(dailyDate);
-  document.getElementById('daily-date-sub').textContent   = isToday?'오늘':'';
+  const dow = dailyDate.getDay();
+  const hol = getHoliday(ds);
+  const dateColor = (dow===0||hol) ? '#ef4444' : dow===6 ? '#3b82f6' : '#111827';
+  const labelEl = document.getElementById('daily-date-label');
+  labelEl.textContent = fmtFull(dailyDate);
+  labelEl.style.color = dateColor;
+  const subParts = [];
+  if (isToday) subParts.push('오늘');
+  if (hol) subParts.push(hol);
+  document.getElementById('daily-date-sub').textContent = subParts.join(' · ');
   document.getElementById('daily-today-btn').style.display = isToday ? 'none' : 'inline-block';
 
   const rs=routinesForDate(ds), ck=getChecks(ds);
@@ -1578,7 +1586,10 @@ function renderProject() {
           : repType === 'weekly' ? r.repeat.days.map(d => DAY_KR[d]).join('·') + '요일'
           : `${r.repeat.dates.length}일 지정`;
         const badge = mk('span', 'repeat-badge'); badge.textContent = rdesc;
-        row.append(txt, badge);
+        const editBtn = mk('button', 'icon-btn');
+        editBtn.textContent = '✏️'; editBtn.style.color = '#9ca3af';
+        editBtn.onclick = () => { _editContextDs = todayStr(); openEditModal(r.id); };
+        row.append(txt, badge, editBtn);
         block.appendChild(row);
       });
     }
@@ -1603,7 +1614,10 @@ function renderProject() {
         const txt   = mk('span', 'proj-task-text'); txt.textContent = t.text;
         const dd    = ddayInfo(t.dueDate);
         const badge = mk('span', 'dday-badge ' + dd.cls); badge.textContent = dd.text;
-        row.append(txt, badge);
+        const editBtn = mk('button', 'icon-btn');
+        editBtn.textContent = '✏️'; editBtn.style.color = '#9ca3af';
+        editBtn.onclick = () => openEditTaskModal(t.id);
+        row.append(txt, badge, editBtn);
         block.appendChild(row);
       });
     }
