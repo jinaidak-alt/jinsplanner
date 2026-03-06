@@ -87,7 +87,8 @@
     .wc-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#6366f1,#8b5cf6);transition:width .4s;}
     .wc-pct{font-size:11px;color:#6b7280;font-weight:500;}
     .week-col.is-today .wc-pct{color:#6366f1;font-weight:700;}
-    .week-col-body{padding:8px 6px;}
+    .week-col-body{padding:8px 6px;transition:background .15s;}
+    .week-col-body.drag-target{background:#ede9fe;border-radius:8px;}
     .wc-item{display:flex;align-items:flex-start;gap:4px;padding:5px 4px;border-radius:7px;cursor:pointer;transition:background .15s;position:relative;}
     .wc-item:hover{background:#f9fafb;}
     .wc-item.done .wc-name{text-decoration:line-through;color:#9ca3af;}
@@ -1060,6 +1061,22 @@ function renderDaily() {
   renderDailyTasks(ds);
 }
 
+function moveTaskToDate(taskId, newDs) {
+  const tasks = getTasks();
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const oldDs = t.startDate || t.dueDate;
+  if (oldDs === newDs) return;
+  if (t.startDate) {
+    if (t.dueDate === t.startDate) t.dueDate = newDs;
+    t.startDate = newDs;
+  } else {
+    t.dueDate = newDs;
+  }
+  saveTasks(tasks);
+  renderWeekly();
+}
+
 // ─────────────────────────────────────────
 // RENDER WEEKLY
 // ─────────────────────────────────────────
@@ -1099,6 +1116,9 @@ function renderWeekly() {
 
     // Body (routine list)
     const body = mk('div','week-col-body');
+    body.addEventListener('dragover', (e) => { e.preventDefault(); body.classList.add('drag-target'); });
+    body.addEventListener('dragleave', (e) => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-target'); });
+    body.addEventListener('drop', (e) => { e.preventDefault(); body.classList.remove('drag-target'); const tid=e.dataTransfer.getData('taskId'); if(tid) moveTaskToDate(tid, ds); });
     if (!rs.length && !dayTasks.length) {
       const emp=mk('div','wc-empty'); emp.textContent='없음'; body.appendChild(emp);
     } else {
@@ -1155,6 +1175,9 @@ function renderWeekly() {
           const editBtn= mk('button','wc-edit'); editBtn.textContent='✏️';
           editBtn.onclick=(e)=>{ e.stopPropagation(); openEditTaskModal(t.id); };
 
+          item.draggable = true;
+          item.addEventListener('dragstart', (e) => { e.dataTransfer.setData('taskId', t.id); e.dataTransfer.effectAllowed='move'; setTimeout(()=>item.classList.add('dragging'),0); });
+          item.addEventListener('dragend', () => item.classList.remove('dragging'));
           item.append(cbtn, dot, bodyEl, editBtn);
           body.appendChild(item);
         });
