@@ -2265,11 +2265,27 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
 
+  function isInAppBrowser() {
+    const ua = navigator.userAgent;
+    return /FBAN|FBAV|Instagram|Line|KakaoTalk|NAVER|Snapchat|Twitter|Pinterest|LinkedIn|WhatsApp/i.test(ua)
+      || (ua.includes('wv') && ua.includes('Android'))
+      || /\bWebView\b/i.test(ua);
+  }
+
   function showAuthError(e) {
     console.error(e);
     const el = document.getElementById('auth-error');
     if (!el) return;
     el.textContent = '로그인 오류: ' + (e.message || e.code || '알 수 없는 오류');
+    el.style.display = 'block';
+  }
+
+  function showInAppBrowserError() {
+    const el = document.getElementById('auth-error');
+    if (!el) return;
+    el.innerHTML = 'Chrome 또는 Safari에서 열어주세요. 카카오톡·인스타 등 앱 내 브라우저에서는 Google 로그인이 차단됩니다. '
+      + '<button onclick="navigator.clipboard.writeText(location.href).then(()=>alert(\'주소가 복사되었습니다.\'))" '
+      + 'style="margin-left:6px;padding:2px 8px;border:1px solid #ef4444;border-radius:6px;background:white;color:#ef4444;font-size:11px;cursor:pointer;">주소 복사</button>';
     el.style.display = 'block';
   }
 
@@ -2280,6 +2296,10 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   window.googleLogin = async () => {
     const el = document.getElementById('auth-error');
     if (el) el.style.display = 'none';
+    if (isInAppBrowser()) {
+      showInAppBrowserError();
+      return;
+    }
     try {
       await signInWithRedirect(auth, provider);
     } catch (e) {

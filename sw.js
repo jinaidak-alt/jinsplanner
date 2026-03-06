@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jinsplanner-v7';
+const CACHE_NAME = 'jinsplanner-v8';
 
 const ASSETS = [
   '/jinsplanner/',
