@@ -293,7 +293,8 @@
   </style>
 </head>
 <body>
-<div id="auth-bar" style="display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px 16px; background:#f3f4f6;">
+<div id="auth-bar" style="display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:8px 16px; background:#f3f4f6; flex-wrap:wrap;">
+  <span id="auth-error" style="display:none; font-size:12px; color:#ef4444; flex-basis:100%; text-align:right;"></span>
   <span id="user-info" style="font-size:13px; color:#6366f1;"></span>
   <button id="login-btn" onclick="googleLogin()" style="background:#6366f1; color:white; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer;">구글 로그인</button>
   <button id="logout-btn" onclick="googleLogout()" style="display:none; background:#e5e7eb; color:#374151; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer;">로그아웃</button>
@@ -2121,7 +2122,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+  import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -2139,12 +2140,25 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
 
+  function showAuthError(e) {
+    console.error(e);
+    const el = document.getElementById('auth-error');
+    if (!el) return;
+    el.textContent = '로그인 오류: ' + (e.message || e.code || '알 수 없는 오류');
+    el.style.display = 'block';
+  }
+
+  // 리다이렉트 로그인 결과 처리 (페이지 복귀 시)
+  getRedirectResult(auth).catch(showAuthError);
+
   // 로그인 함수
   window.googleLogin = async () => {
+    const el = document.getElementById('auth-error');
+    if (el) el.style.display = 'none';
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (e) {
-      console.error(e);
+      showAuthError(e);
     }
   };
 
