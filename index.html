@@ -293,6 +293,7 @@
     .repeat-badge{flex-shrink:0;font-size:11px;padding:2px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;}
     /* ── Weekly PC wide ── */
     .app.weekly-active{max-width:1024px;}
+    .routine-memo{font-size:11px;color:#9ca3af;margin-top:2px;white-space:pre-wrap;word-break:break-all;}
   </style>
 </head>
 <body>
@@ -521,6 +522,11 @@
           <input class="form-input" id="add-due-date"        type="date" placeholder="마감일 (선택)"/>
         </div>
       </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">메모 <span style="font-weight:400;color:#9ca3af;font-size:12px;">(선택)</span></label>
+      <textarea id="add-memo" class="form-input" rows="2" placeholder="간단한 메모를 남겨보세요" maxlength="200" style="resize:none;font-size:14px;"></textarea>
     </div>
 
     <div class="form-group">
@@ -841,6 +847,7 @@ function buildRoutineItem(r, ds, opts={}) {
   const info = mk('div','routine-info');
   const txt  = mk('div','routine-text'); txt.textContent = r.text;
   info.appendChild(txt);
+  if (r.memo) { const mEl=mk('div','routine-memo'); mEl.textContent=r.memo; info.appendChild(mEl); }
   const timeStr = fmtTime(r);
   if (timeStr) { const tEl=mk('div','routine-time'); tEl.textContent=timeStr; info.appendChild(tEl); }
 
@@ -1462,6 +1469,7 @@ function openAddModal() {
   document.getElementById('add-text').value='';
   document.getElementById('add-time-start').value='';
   document.getElementById('add-time-end').value='';
+  document.getElementById('add-memo').value='';
   document.getElementById('panel-time-input').style.display='none';
   document.querySelectorAll('.timeslot-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('add-delete').style.display='none';
@@ -1478,6 +1486,7 @@ function openEditModal(id) {
   editId=id; editTaskId=null;
   document.getElementById('modal-add-title').textContent='할 일 수정';
   document.getElementById('add-text').value=r.text;
+  document.getElementById('add-memo').value=r.memo||'';
   document.getElementById('add-delete').style.display='block';
   document.getElementById('add-start-date').value = r.startDate || '';
   addCatId=r.categoryId;
@@ -1553,6 +1562,7 @@ function submitRoutine() {
     timeSlot: timeInputActive ? null : addTaskSlot,
     repeat:{type:addRepeatType, days:[...addDays], dates:[...addDates]},
     startDate: document.getElementById('add-start-date').value || null,
+    memo: document.getElementById('add-memo').value.trim() || null,
   };
   if (editId) {
     const idx=routines.findIndex(r=>r.id===editId);
@@ -1839,6 +1849,7 @@ function submitTask() {
     } : null,
     done:       false,
     createdAt:  new Date().toISOString(),
+    memo:       document.getElementById('add-memo').value.trim() || null,
   };
   if (editTaskId) {
     const idx = tasks.findIndex(t => t.id === editTaskId);
@@ -1873,6 +1884,7 @@ function openEditTaskModal(id) {
   editTaskId = id; editId = null;
   document.getElementById('modal-add-title').textContent = '테스크 수정';
   document.getElementById('add-text').value              = t.text;
+  document.getElementById('add-memo').value              = t.memo || '';
   document.getElementById('add-delete').style.display    = 'block';
   addCatId    = t.categoryId;
   addTaskSlot = t.timeSlot || null;
@@ -1913,6 +1925,7 @@ function buildTaskItem(t) {
   const info = mk('div', 'routine-info');
   const txt  = mk('div', 'routine-text'); txt.textContent = t.text;
   info.appendChild(txt);
+  if (t.memo) { const mEl=mk('div','routine-memo'); mEl.textContent=t.memo; info.appendChild(mEl); }
 
   const badge = mk('span', 'cat-badge');
   badge.textContent      = cat.name;
