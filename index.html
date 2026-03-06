@@ -114,6 +114,9 @@
     .cal-hd.sun{color:#ef4444;}.cal-hd.sat{color:#3b82f6;}
     .wc-dayname.is-sat,.wc-date.is-sat{color:#3b82f6;}
     .wc-dayname.is-sun,.wc-date.is-sun{color:#ef4444;}
+    .sort-bar{display:flex;gap:6px;margin-bottom:8px;}
+    .sort-btn{font-size:12px;padding:3px 10px;border-radius:12px;border:1px solid #d1d5db;background:#fff;color:#6b7280;cursor:pointer;}
+    .sort-btn.active{background:#6366f1;color:#fff;border-color:#6366f1;}
     .wc-holiday,.cal-holiday{font-size:9px;color:#ef4444;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .cal-day{border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;cursor:pointer;transition:transform .1s,box-shadow .1s;-webkit-tap-highlight-color:transparent;overflow:hidden;}
     .cal-day:not(.empty):hover{transform:scale(1.05);box-shadow:0 2px 8px rgba(0,0,0,.12);}
@@ -367,6 +370,10 @@
     </div>
 
 
+    <div id="daily-sort-bar" class="sort-bar">
+      <button id="sort-time-btn" class="sort-btn active">시간순</button>
+      <button id="sort-area-btn" class="sort-btn">영역순</button>
+    </div>
     <div id="daily-list" class="routine-list"></div>
     <div id="daily-tasks-section" style="display:none">
       <div class="task-section-title">오늘의 테스크</div>
@@ -612,6 +619,14 @@
 // ─────────────────────────────────────────
 const DAY_KR   = ['일','월','화','수','목','금','토'];
 const DAY_MON  = ['월','화','수','목','금','토','일']; // Mon-first
+let dailySortMode = localStorage.getItem('dailySortMode') || 'time'; // 'time' | 'area'
+function setDailySortMode(mode) {
+  dailySortMode = mode;
+  localStorage.setItem('dailySortMode', mode);
+  document.getElementById('sort-time-btn').classList.toggle('active', mode==='time');
+  document.getElementById('sort-area-btn').classList.toggle('active', mode==='area');
+  renderCurrent();
+}
 const HOLIDAYS = {
   '01-01':'신정','03-01':'삼일절','05-05':'어린이날',
   '06-06':'현충일','08-15':'광복절','10-03':'개천절','10-09':'한글날','12-25':'성탄절',
@@ -1180,8 +1195,17 @@ function renderDaily() {
   const listEl=document.getElementById('daily-list');
   listEl.innerHTML='';
   if (!rs.length) { listEl.innerHTML='<div class="empty">이 날의 할 일이 없습니다.<br>+ 버튼으로 추가해 보세요.</div>'; }
-  else {
-    rs.forEach(r => {
+  else if (dailySortMode === 'area') {
+    const catIds = [...new Set(rs.map(r=>r.categoryId))];
+    catIds.sort((a,b)=>catById(a).name.localeCompare(catById(b).name));
+    catIds.forEach(catId=>{
+      const group = rs.filter(r=>r.categoryId===catId).sort((a,b)=>(a.time?.start||'99:99').localeCompare(b.time?.start||'99:99'));
+      const hd = mk('div','time-block-hd'); hd.textContent = catById(catId).name; listEl.appendChild(hd);
+      group.forEach(r=>listEl.appendChild(buildRoutineItem(r,ds)));
+    });
+  } else {
+    const sorted = [...rs].sort((a,b)=>(a.time?.start||'99:99').localeCompare(b.time?.start||'99:99'));
+    sorted.forEach(r => {
       const item = buildRoutineItem(r, ds);
       item.dataset.dragId = r.id;
       listEl.appendChild(item);
@@ -1258,7 +1282,10 @@ function renderWeekly() {
     if (!rs.length && !dayTasks.length) {
       const emp=mk('div','wc-empty'); emp.textContent='없음'; body.appendChild(emp);
     } else {
-      rs.forEach(r=>{
+      const sortedRs = dailySortMode==='area'
+        ? [...rs].sort((a,b)=>catById(a.categoryId).name.localeCompare(catById(b.categoryId).name)||(a.time?.start||'99:99').localeCompare(b.time?.start||'99:99'))
+        : [...rs].sort((a,b)=>(a.time?.start||'99:99').localeCompare(b.time?.start||'99:99'));
+      sortedRs.forEach(r=>{
         const cat    = catById(r.categoryId);
         const isDone = !!ck[r.id];
         const item   = mk('div','wc-item'+(isDone?' done':''));
@@ -1291,7 +1318,10 @@ function renderWeekly() {
           const div = mk('div',''); div.style.cssText='border-top:1px dashed #e5e7eb;margin:4px 2px;';
           body.appendChild(div);
         }
-        dayTasks.forEach(t=>{
+        const sortedTasks = dailySortMode==='area'
+          ? [...dayTasks].sort((a,b)=>catById(a.categoryId).name.localeCompare(catById(b.categoryId).name))
+          : dayTasks;
+        sortedTasks.forEach(t=>{
           const cat    = catById(t.categoryId);
           const item   = mk('div','wc-item'+(t.done?' done':''));
 
@@ -1408,7 +1438,7 @@ function renderMonthly() {
   const tbody=document.createElement('tbody');
   routines.forEach(r=>{
     const cat=catById(r.categoryId); let sch=0,done=0;
-    dateStrs.forEach(ds=>{ if(routineOnDate(r,ds)){sch++;if(getChecks(ds)[r.id])done++;} });
+    dateStrs.forEach(ds=>{ if(routineOnDate(r,ds)&&(!r.startDate||ds>=r.startDate)&&(!r.endDate||ds<=r.endDate)){sch++;if(getChecks(ds)[r.id])done++;} });
     if (!sch) return;
     const pct=Math.round(done/sch*100);
     const row=document.createElement('tr');
@@ -2086,43 +2116,52 @@ function renderDailyTasks(ds) {
 
   if (!tasks.length) { section.style.display = 'none'; return; }
 
-  const SLOTS = [
-    {key:'morning',   label:'🌅 오전'},
-    {key:'afternoon', label:'☀️ 오후'},
-    {key:'evening',   label:'🌙 저녁'},
-    {key:null,        label:'⏱ 시간대 미정'},
-  ];
-
   section.style.display = 'block';
   listEl.innerHTML = '';
 
-  const tOrder = getTaskOrder();
-  SLOTS.forEach(({key, label}) => {
-    const group = tasks.filter(t => (t.timeSlot || null) === key);
-    if (!group.length) return;
-    group.sort((a, b) => {
-      const ai = tOrder.indexOf(a.id), bi = tOrder.indexOf(b.id);
-      if (ai !== -1 && bi !== -1) return ai - bi;
-      if (ai !== -1) return -1;
-      if (bi !== -1) return 1;
-      return a.done === b.done ? 0 : a.done ? 1 : -1;
+  if (dailySortMode === 'area') {
+    const catIds = [...new Set(tasks.map(t=>t.categoryId))];
+    catIds.sort((a,b)=>catById(a).name.localeCompare(catById(b).name));
+    catIds.forEach(catId=>{
+      const group = tasks.filter(t=>t.categoryId===catId).sort((a,b)=>(a.time?.start||'99:99').localeCompare(b.time?.start||'99:99'));
+      const hd = mk('div','time-block-hd'); hd.textContent = catById(catId).name; listEl.appendChild(hd);
+      group.forEach(t=>listEl.appendChild(buildTaskItem(t)));
     });
-    const hd = mk('div', 'time-block-hd'); hd.textContent = label;
-    listEl.appendChild(hd);
-    const wrap = mk('div');
-    group.forEach(t => {
-      const item = buildTaskItem(t);
-      item.dataset.dragId = t.id;
-      wrap.appendChild(item);
+  } else {
+    const SLOTS = [
+      {key:'morning',   label:'🌅 오전'},
+      {key:'afternoon', label:'☀️ 오후'},
+      {key:'evening',   label:'🌙 저녁'},
+      {key:null,        label:'⏱ 시간대 미정'},
+    ];
+    const tOrder = getTaskOrder();
+    SLOTS.forEach(({key, label}) => {
+      const group = tasks.filter(t => (t.timeSlot || null) === key);
+      if (!group.length) return;
+      group.sort((a, b) => {
+        const ai = tOrder.indexOf(a.id), bi = tOrder.indexOf(b.id);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.done === b.done ? 0 : a.done ? 1 : -1;
+      });
+      const hd = mk('div', 'time-block-hd'); hd.textContent = label;
+      listEl.appendChild(hd);
+      const wrap = mk('div');
+      group.forEach(t => {
+        const item = buildTaskItem(t);
+        item.dataset.dragId = t.id;
+        wrap.appendChild(item);
+      });
+      listEl.appendChild(wrap);
+      addDragDrop(wrap, (slotIds) => {
+        const slotSet = new Set(slotIds);
+        const merged = [...getTaskOrder().filter(id => !slotSet.has(id)), ...slotIds];
+        localStorage.setItem('taskOrder', JSON.stringify(merged));
+        if (window.saveToCloud) saveToCloud();
+      });
     });
-    listEl.appendChild(wrap);
-    addDragDrop(wrap, (slotIds) => {
-      const slotSet = new Set(slotIds);
-      const merged = [...getTaskOrder().filter(id => !slotSet.has(id)), ...slotIds];
-      localStorage.setItem('taskOrder', JSON.stringify(merged));
-      if (window.saveToCloud) saveToCloud();
-    });
-  });
+  }
 }
 
 // ─────────────────────────────────────────
@@ -2160,6 +2199,12 @@ document.getElementById('note-textarea').onkeydown = e => {
     document.getElementById('note-save-btn').click();
   }
 };
+
+// Daily sort
+document.getElementById('sort-time-btn').onclick=()=>setDailySortMode('time');
+document.getElementById('sort-area-btn').onclick=()=>setDailySortMode('area');
+document.getElementById('sort-time-btn').classList.toggle('active', dailySortMode==='time');
+document.getElementById('sort-area-btn').classList.toggle('active', dailySortMode==='area');
 
 // Daily nav
 document.getElementById('daily-prev').onclick=()=>{ dailyDate.setDate(dailyDate.getDate()-1); renderDaily(); };
