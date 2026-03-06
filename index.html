@@ -2375,6 +2375,10 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
         .then((reg) => console.log('[SW] 등록 성공:', reg.scope))
         .catch((err) => console.error('[SW] 등록 실패:', err));
     });
+    // 새 Service Worker가 활성화되면 페이지 자동 새로고침 (최신 버전 반영)
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
   }
 </script>
 </body>
