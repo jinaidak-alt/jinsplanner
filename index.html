@@ -14,7 +14,7 @@
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:#f0f4f8;min-height:100vh;}
-    .app{max-width:640px;margin:0 auto;padding-bottom:100px;}
+    .app{max-width:1024px;margin:0 auto;padding-bottom:100px;}
 
     /* ── Tab bar ── */
     .tab-bar{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;padding:0 8px;}
@@ -48,6 +48,8 @@
     .routine-list{display:flex;flex-direction:column;gap:8px;}
     .routine-item{display:flex;align-items:center;gap:10px;padding:13px 14px;background:#fff;border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:opacity .2s;}
     .routine-item.done{opacity:.5;}
+    .routine-item.dragging{opacity:.35;box-shadow:none;}
+    .routine-item.drag-over{outline:2px dashed #6366f1;outline-offset:-2px;}
     .cat-bar{width:4px;border-radius:2px;flex-shrink:0;align-self:stretch;}
     .check-btn{width:24px;height:24px;border-radius:50%;border:2px solid #d1d5db;background:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;transition:all .2s;}
     .routine-info{flex:1;min-width:0;}
@@ -135,7 +137,7 @@
        ════════════════════════════════ */
     .detail-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:250;}
     .detail-overlay.open{display:block;}
-    .detail-panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:640px;background:#fff;border-radius:20px 20px 0 0;padding:16px 20px 40px;max-height:70vh;overflow-y:auto;z-index:260;animation:slideUp .25s ease;}
+    .detail-panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:1024px;background:#fff;border-radius:20px 20px 0 0;padding:16px 20px 40px;max-height:70vh;overflow-y:auto;z-index:260;animation:slideUp .25s ease;}
     @keyframes slideUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
     .detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
     .detail-title{font-size:16px;font-weight:700;color:#111827;}
@@ -156,7 +158,7 @@
        ════════════════════════════════ */
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:flex-end;justify-content:center;}
     .modal-overlay.open{display:flex;}
-    .modal-sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;padding:20px 20px 40px;animation:slideUpM .25s ease;}
+    .modal-sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:1024px;max-height:92vh;overflow-y:auto;padding:20px 20px 40px;animation:slideUpM .25s ease;}
     @keyframes slideUpM{from{transform:translateY(100%)}to{transform:translateY(0)}}
     .handle{width:38px;height:4px;background:#e5e7eb;border-radius:999px;margin:0 auto 18px;}
     .modal-title{font-size:18px;font-weight:700;color:#111827;margin-bottom:18px;}
@@ -563,7 +565,7 @@
 
 <!-- DELETE SCOPE SHEET -->
 <div id="delete-scope-backdrop" onclick="_closeScopeSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;"></div>
-<div id="delete-scope-sheet" style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:640px;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 40px;z-index:501;">
+<div id="delete-scope-sheet" style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:1024px;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 40px;z-index:501;">
   <div style="width:38px;height:4px;background:#e5e7eb;border-radius:999px;margin:0 auto 18px;"></div>
   <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:16px;">이 반복 일정을 어떻게 삭제할까요?</div>
   <div style="display:flex;gap:8px;">
@@ -572,6 +574,26 @@
     <button onclick="delScopeAll()" style="flex:1;padding:12px;background:#fef2f2;color:#ef4444;border:none;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;">전체 삭제</button>
   </div>
   <button onclick="_closeScopeSheet()" style="width:100%;margin-top:12px;background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:8px;">취소</button>
+</div>
+
+<!-- CLEAR CHECKS SHEET -->
+<div id="clear-checks-backdrop" onclick="_closeClearChecksSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;"></div>
+<div id="clear-checks-sheet" style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:1024px;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 40px;z-index:501;">
+  <div style="width:38px;height:4px;background:#e5e7eb;border-radius:999px;margin:0 auto 18px;"></div>
+  <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:8px;">체크 기록 초기화</div>
+  <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">날짜 범위를 지정하지 않으면 전체 초기화됩니다.</div>
+  <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <label style="font-size:14px;color:#374151;width:44px;flex-shrink:0;">시작일</label>
+      <input type="date" id="clear-checks-from" style="flex:1;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;color:#374151;outline:none;">
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <label style="font-size:14px;color:#374151;width:44px;flex-shrink:0;">종료일</label>
+      <input type="date" id="clear-checks-to" style="flex:1;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;color:#374151;outline:none;">
+    </div>
+  </div>
+  <button onclick="_confirmClearChecks()" style="width:100%;padding:12px;background:#ef4444;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;">초기화</button>
+  <button onclick="_closeClearChecksSheet()" style="width:100%;padding:12px;background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">취소</button>
 </div>
 
 <script>
@@ -710,6 +732,10 @@ const saveSkips = s  => { localStorage.setItem('skips', JSON.stringify(s)); if (
 const getNotifSettings  = () => JSON.parse(localStorage.getItem('notifSettings') || '{"dailyTime":"09:00"}');
 const saveNotifSettings = s  => { localStorage.setItem('notifSettings', JSON.stringify(s)); if (window.saveToCloud) saveToCloud(); };
 
+const getRoutineOrder  = () => JSON.parse(localStorage.getItem('routineOrder') || '[]');
+const saveRoutineOrder = o  => { localStorage.setItem('routineOrder', JSON.stringify(o)); if (window.saveToCloud) saveToCloud(); };
+const getTaskOrder     = () => JSON.parse(localStorage.getItem('taskOrder') || '[]');
+
 // ─────────────────────────────────────────
 // Date helpers
 // ─────────────────────────────────────────
@@ -754,7 +780,12 @@ const routinesForDate = ds => {
     (!r.startDate || ds >= r.startDate) &&
     (!r.endDate   || ds <= r.endDate)
   );
-  return rs.sort((a,b)=>{
+  const order = getRoutineOrder();
+  return rs.sort((a, b) => {
+    const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
     const ta=a.time?.start||'99:99', tb=b.time?.start||'99:99';
     return ta.localeCompare(tb);
   });
@@ -959,6 +990,31 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
+function addDragDrop(containerEl, saveFn) {
+  let dragSrc = null;
+  containerEl.querySelectorAll('[data-drag-id]').forEach(el => {
+    el.draggable = true;
+    el.addEventListener('dragstart', function(e) {
+      dragSrc = this;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => this.classList.add('dragging'), 0);
+    });
+    el.addEventListener('dragend', function() {
+      this.classList.remove('dragging');
+      containerEl.querySelectorAll('[data-drag-id]').forEach(e => e.classList.remove('drag-over'));
+      dragSrc = null;
+      saveFn([...containerEl.querySelectorAll('[data-drag-id]')].map(e => e.dataset.dragId));
+    });
+    el.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === this) return;
+      const mid = this.getBoundingClientRect().top + this.getBoundingClientRect().height / 2;
+      if (e.clientY < mid) containerEl.insertBefore(dragSrc, this);
+      else containerEl.insertBefore(dragSrc, this.nextSibling);
+    });
+  });
+}
+
 function renderDaily() {
   const ds      = toStr(dailyDate);
   const isToday = ds===todayStr();
@@ -993,7 +1049,14 @@ function renderDaily() {
   const listEl=document.getElementById('daily-list');
   listEl.innerHTML='';
   if (!rs.length) { listEl.innerHTML='<div class="empty">이 날의 할 일이 없습니다.<br>+ 버튼으로 추가해 보세요.</div>'; }
-  else { rs.forEach(r => listEl.appendChild(buildRoutineItem(r,ds))); }
+  else {
+    rs.forEach(r => {
+      const item = buildRoutineItem(r, ds);
+      item.dataset.dragId = r.id;
+      listEl.appendChild(item);
+    });
+    addDragDrop(listEl, saveRoutineOrder);
+  }
   renderDailyTasks(ds);
 }
 
@@ -1864,13 +1927,32 @@ function renderDailyTasks(ds) {
   section.style.display = 'block';
   listEl.innerHTML = '';
 
+  const tOrder = getTaskOrder();
   SLOTS.forEach(({key, label}) => {
     const group = tasks.filter(t => (t.timeSlot || null) === key);
     if (!group.length) return;
-    group.sort((a, b) => a.done === b.done ? 0 : a.done ? 1 : -1);
+    group.sort((a, b) => {
+      const ai = tOrder.indexOf(a.id), bi = tOrder.indexOf(b.id);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.done === b.done ? 0 : a.done ? 1 : -1;
+    });
     const hd = mk('div', 'time-block-hd'); hd.textContent = label;
     listEl.appendChild(hd);
-    group.forEach(t => listEl.appendChild(buildTaskItem(t)));
+    const wrap = mk('div');
+    group.forEach(t => {
+      const item = buildTaskItem(t);
+      item.dataset.dragId = t.id;
+      wrap.appendChild(item);
+    });
+    listEl.appendChild(wrap);
+    addDragDrop(wrap, (slotIds) => {
+      const slotSet = new Set(slotIds);
+      const merged = [...getTaskOrder().filter(id => !slotSet.has(id)), ...slotIds];
+      localStorage.setItem('taskOrder', JSON.stringify(merged));
+      if (window.saveToCloud) saveToCloud();
+    });
   });
 }
 
@@ -1974,11 +2056,29 @@ document.getElementById('notif-daily-time').addEventListener('change', e => {
 });
 
 // 위험 구역
-document.getElementById('btn-clear-checks').onclick = () => {
-  if (!confirm('정말 초기화하시겠습니까?')) return;
+function _closeClearChecksSheet() {
+  document.getElementById('clear-checks-sheet').style.display = 'none';
+  document.getElementById('clear-checks-backdrop').style.display = 'none';
+}
+function _confirmClearChecks() {
   if (!confirm('이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?')) return;
-  localStorage.removeItem('checks');
-  closeManageModal(); renderCurrent();
+  const from = document.getElementById('clear-checks-from').value;
+  const to   = document.getElementById('clear-checks-to').value;
+  const all  = getAllChecks();
+  Object.keys(all).forEach(ds => {
+    if ((!from || ds >= from) && (!to || ds <= to)) delete all[ds];
+  });
+  localStorage.setItem('checks', JSON.stringify(all));
+  if (window.saveToCloud) saveToCloud();
+  _closeClearChecksSheet();
+  closeManageModal();
+  renderCurrent();
+}
+document.getElementById('btn-clear-checks').onclick = () => {
+  document.getElementById('clear-checks-from').value = '';
+  document.getElementById('clear-checks-to').value   = '';
+  document.getElementById('clear-checks-sheet').style.display = 'block';
+  document.getElementById('clear-checks-backdrop').style.display = 'block';
 };
 document.getElementById('btn-clear-all').onclick = () => {
   if (!confirm('정말 초기화하시겠습니까?')) return;
@@ -2186,7 +2286,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
         const data = docSnap.data();
         if (data.appData) {
           const parsed = JSON.parse(data.appData);
-          ['cats','routines','checks','notes','tasks','skips','notifSettings'].forEach(key => {
+          ['cats','routines','checks','notes','tasks','skips','notifSettings','routineOrder','taskOrder'].forEach(key => {
             if (parsed[key]) localStorage.setItem(key, parsed[key]);
           });
           if (window.renderCurrent) renderCurrent();
@@ -2216,6 +2316,8 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       tasks:         localStorage.getItem('tasks'),
       skips:         localStorage.getItem('skips'),
       notifSettings: localStorage.getItem('notifSettings'),
+      routineOrder:  localStorage.getItem('routineOrder'),
+      taskOrder:     localStorage.getItem('taskOrder'),
     });
     await setDoc(doc(db, 'users', user.uid), { appData });
   };
