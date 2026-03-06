@@ -365,7 +365,7 @@
 
     <div id="daily-list" class="routine-list"></div>
     <div id="daily-tasks-section" style="display:none">
-      <div class="task-section-title">오늘의 태스크</div>
+      <div class="task-section-title">오늘의 테스크</div>
       <div id="daily-tasks-list" class="routine-list"></div>
     </div>
     <button id="btn-add" class="add-task-btn">＋ 할 일 추가</button>
@@ -512,7 +512,7 @@
       <input class="form-input" id="add-start-date" type="date"/>
     </div>
 
-    <!-- ── Task-specific fields (단발 태스크) ── -->
+    <!-- ── Task-specific fields (단발 테스크) ── -->
     <div id="panel-task-fields" style="display:none">
       <div class="form-group">
         <label class="form-label">날짜 <span style="font-weight:400;color:#9ca3af">(선택)</span></label>
@@ -723,7 +723,7 @@ function saveNoteFor(ds, text) {
   if (window.saveToCloud) saveToCloud();
 }
 
-// Tasks storage (단발 태스크)
+// Tasks storage (단발 테스크)
 const getTasks  = () => JSON.parse(localStorage.getItem('tasks') || '[]');
 const saveTasks = t  => { localStorage.setItem('tasks', JSON.stringify(t)); if (window.saveToCloud) saveToCloud(); scheduleTaskNotifications(); };
 const getSkips  = () => JSON.parse(localStorage.getItem('skips') || '{}');
@@ -911,7 +911,7 @@ function renderOverdueSection() {
   if (!tasks.length) { section.style.display = 'none'; return; }
   tasks.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   section.style.display = 'block';
-  document.getElementById('overdue-title').textContent = `⚠️ 미완료 태스크 (${tasks.length}개)`;
+  document.getElementById('overdue-title').textContent = `⚠️ 미완료 테스크 (${tasks.length}개)`;
   const listEl = document.getElementById('overdue-list'); listEl.innerHTML = '';
   tasks.forEach(t => listEl.appendChild(buildOverdueItem(t)));
 }
@@ -1415,9 +1415,9 @@ function renderProject() {
       });
     }
 
-    // 📋 태스크 섹션
+    // 📋 테스크 섹션
     if (catTasks.length) {
-      const secHd = mk('div', 'proj-section-hd'); secHd.textContent = '📋 태스크';
+      const secHd = mk('div', 'proj-section-hd'); secHd.textContent = '📋 테스크';
       block.appendChild(secHd);
 
       catTasks.sort((a, b) => {
@@ -1779,7 +1779,7 @@ function renderManageCategories() {
 function mk(tag,cls){ const el=document.createElement(tag); if(cls) el.className=cls; return el; }
 
 // ─────────────────────────────────────────
-// TASK (단발 태스크) functions
+// TASK (단발 테스크) functions
 // ─────────────────────────────────────────
 function setAddType(type) {
   addType = type;
@@ -1871,7 +1871,7 @@ function openEditTaskModal(id) {
   const t = getTasks().find(x => x.id === id);
   if (!t) return;
   editTaskId = id; editId = null;
-  document.getElementById('modal-add-title').textContent = '태스크 수정';
+  document.getElementById('modal-add-title').textContent = '테스크 수정';
   document.getElementById('add-text').value              = t.text;
   document.getElementById('add-delete').style.display    = 'block';
   addCatId    = t.categoryId;
