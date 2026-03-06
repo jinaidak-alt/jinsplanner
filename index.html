@@ -87,8 +87,8 @@
     .wc-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#6366f1,#8b5cf6);transition:width .4s;}
     .wc-pct{font-size:11px;color:#6b7280;font-weight:500;}
     .week-col.is-today .wc-pct{color:#6366f1;font-weight:700;}
-    .week-col-body{padding:8px 6px;transition:background .15s;}
-    .week-col-body.drag-target{background:#ede9fe;border-radius:8px;}
+    .week-col-body{padding:8px 6px;}
+    .week-col.drag-target{box-shadow:0 0 0 2px #8b5cf6,0 1px 6px rgba(139,92,246,.2);}
     .wc-item{display:flex;align-items:flex-start;gap:4px;padding:5px 4px;border-radius:7px;cursor:pointer;transition:background .15s;position:relative;}
     .wc-item:hover{background:#f9fafb;}
     .wc-item.done .wc-name{text-decoration:line-through;color:#9ca3af;}
@@ -1104,6 +1104,11 @@ function renderWeekly() {
     if (total) { totDone+=done; totTotal+=total; }
 
     const col  = mk('div','week-col'+(isToday?' is-today':''));
+    let _enterCount = 0;
+    col.addEventListener('dragenter', (e) => { e.preventDefault(); _enterCount++; col.classList.add('drag-target'); });
+    col.addEventListener('dragleave', ()  => { _enterCount--; if (_enterCount === 0) col.classList.remove('drag-target'); });
+    col.addEventListener('dragover',  (e) => { e.preventDefault(); });
+    col.addEventListener('drop',      (e) => { e.preventDefault(); _enterCount=0; col.classList.remove('drag-target'); const tid=e.dataTransfer.getData('taskId'); if(tid) moveTaskToDate(tid,ds); });
 
     // Header
     const head = mk('div','week-col-head');
@@ -1116,9 +1121,6 @@ function renderWeekly() {
 
     // Body (routine list)
     const body = mk('div','week-col-body');
-    body.addEventListener('dragover', (e) => { e.preventDefault(); body.classList.add('drag-target'); });
-    body.addEventListener('dragleave', (e) => { if (!body.contains(e.relatedTarget)) body.classList.remove('drag-target'); });
-    body.addEventListener('drop', (e) => { e.preventDefault(); body.classList.remove('drag-target'); const tid=e.dataTransfer.getData('taskId'); if(tid) moveTaskToDate(tid, ds); });
     if (!rs.length && !dayTasks.length) {
       const emp=mk('div','wc-empty'); emp.textContent='없음'; body.appendChild(emp);
     } else {
