@@ -4,6 +4,7 @@
   <!-- PWA -->
   <link rel="manifest" href="/jinsplanner/manifest.json">
   <meta name="theme-color" content="#6366f1">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="한걸음">
@@ -2503,7 +2504,12 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   }
 
   // 리다이렉트 로그인 결과 처리 (페이지 복귀 시)
-  getRedirectResult(auth).catch(showAuthError);
+  getRedirectResult(auth).then((result) => {
+    if (result) console.log('[Auth] 리다이렉트 로그인 성공:', result.user?.email);
+  }).catch((e) => {
+    console.error('[Auth] getRedirectResult 에러:', e.code, e.message);
+    showAuthError(e);
+  });
 
   // 로그인 함수
   window.googleLogin = async () => {
