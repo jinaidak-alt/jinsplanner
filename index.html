@@ -2540,7 +2540,11 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       const appleProvider = new OAuthProvider('apple.com');
       appleProvider.addScope('email');
       appleProvider.addScope('name');
-      await signInWithPopup(auth, appleProvider);
+      if (isIOS) {
+        await signInWithRedirect(auth, appleProvider);
+      } else {
+        await signInWithPopup(auth, appleProvider);
+      }
     } catch (e) {
       console.error('[Auth] Apple 로그인 에러:', e.code, e.message);
       showAuthError(e);
