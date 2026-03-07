@@ -307,6 +307,10 @@
   <span id="auth-error" style="display:none; font-size:12px; color:#ef4444; flex-basis:100%; text-align:right;"></span>
   <span id="user-info" style="font-size:13px; color:#6366f1;"></span>
   <button id="login-btn" onclick="googleLogin()" style="background:#6366f1; color:white; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer;">구글 로그인</button>
+  <button id="apple-login-btn" onclick="appleLogin()" style="display:flex; align-items:center; gap:6px; background:#000; color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit;">
+    <svg width="13" height="16" viewBox="0 0 814 1000" fill="white"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105-37.5-155.5-114.1C206.4 815 181.9 739.2 181.9 666.7c0-142.6 93.7-218.3 184.7-218.3 49.6 0 90.9 32.5 121.1 32.5 28.9 0 75.3-34.5 132.8-34.5zm-242-181.2c-27.2 0-55.4 18.2-73.5 45.2-16.5 24.5-29.8 62.4-29.8 100.3 0 5.6.7 11.2 1.3 13.1 3.2.4 8.4.7 13.6.7 24.2 0 50-16.5 67.8-42.5 20.1-29.4 31.9-67.9 31.9-104.1 0-4.9-.3-9.8-1.3-13.5-3.2-.4-6.5-.7-9.9-.7z"/></svg>
+    Sign in with Apple
+  </button>
   <button id="logout-btn" onclick="googleLogout()" style="display:none; background:#e5e7eb; color:#374151; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer;">로그아웃</button>
 </div>
 <div class="app">
@@ -2450,7 +2454,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+  import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -2467,6 +2471,12 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   const auth = getAuth(app);
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    const googleBtn = document.getElementById('login-btn');
+    if (googleBtn) googleBtn.style.display = 'none';
+  }
 
   function isInAppBrowser() {
     const ua = navigator.userAgent;
@@ -2510,6 +2520,20 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
     }
   };
 
+  // Apple 로그인 함수
+  window.appleLogin = async () => {
+    const el = document.getElementById('auth-error');
+    if (el) el.style.display = 'none';
+    try {
+      const appleProvider = new OAuthProvider('apple.com');
+      appleProvider.addScope('email');
+      appleProvider.addScope('name');
+      await signInWithRedirect(auth, appleProvider);
+    } catch (e) {
+      showAuthError(e);
+    }
+  };
+
   // 로그아웃 함수
   window.googleLogout = async () => {
     await signOut(auth);
@@ -2518,14 +2542,16 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   // 로그인 상태 감지
   onAuthStateChanged(auth, async (user) => {
     const loginBtn = document.getElementById('login-btn');
+    const appleLoginBtn = document.getElementById('apple-login-btn');
     const logoutBtn = document.getElementById('logout-btn');
     const userInfo = document.getElementById('user-info');
 
     if (user) {
       // 로그인 상태
       if (loginBtn) loginBtn.style.display = 'none';
+      if (appleLoginBtn) appleLoginBtn.style.display = 'none';
       if (logoutBtn) logoutBtn.style.display = 'block';
-      if (userInfo) userInfo.textContent = user.displayName + '님';
+      if (userInfo) userInfo.textContent = (user.displayName || user.email || '사용자') + '님';
 
       // Firestore에서 데이터 불러오기
       const docRef = doc(db, 'users', user.uid);
@@ -2546,7 +2572,8 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       }
     } else {
       // 로그아웃 상태
-      if (loginBtn) loginBtn.style.display = 'block';
+      if (loginBtn) loginBtn.style.display = isIOS ? 'none' : 'block';
+      if (appleLoginBtn) appleLoginBtn.style.display = 'flex';
       if (logoutBtn) logoutBtn.style.display = 'none';
       if (userInfo) userInfo.textContent = '';
     }
