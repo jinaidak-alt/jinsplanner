@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jinsplanner-v19';
+const CACHE_NAME = 'jinsplanner-v20';
 
 const ASSETS = [
   '/jinsplanner/',
@@ -34,13 +34,15 @@ self.addEventListener('fetch', (e) => {
   const isHTML = e.request.destination === 'document';
   if (isHTML) {
     // HTML은 항상 최신 버전을 우선 (redirect 후 구버전 캐시 노출 방지)
+    // 네트워크 실패 또는 non-200 응답 모두 캐시로 폴백
     e.respondWith(
       fetch(e.request).then((response) => {
         if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          return response;
         }
-        return response;
+        return caches.match('/jinsplanner/index.html');
       }).catch(() => caches.match('/jinsplanner/index.html'))
     );
     return;
