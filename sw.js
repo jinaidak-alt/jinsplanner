@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jinsplanner-v17';
+const CACHE_NAME = 'jinsplanner-v18';
 
 const ASSETS = [
   '/jinsplanner/',
@@ -29,6 +29,7 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  if (!e.request.url.startsWith('http')) return;
   e.respondWith(
     caches.match(e.request).then((cached) => {
       if (cached) return cached;
