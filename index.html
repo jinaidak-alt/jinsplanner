@@ -2493,6 +2493,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   }
 
   function showAuthError(e) {
+    if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') return;
     console.error(e);
     const el = document.getElementById('auth-error');
     if (!el) return;
