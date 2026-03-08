@@ -1637,7 +1637,7 @@ function renderProject() {
       catTasks.forEach(t => {
         const row   = mk('div', 'proj-task-row' + (t.done ? ' done' : ''));
         const txt   = mk('span', 'proj-task-text'); txt.textContent = t.text;
-        const dd    = ddayInfo(t.dueDate);
+        const dd    = ddayInfo(t.dueDate || t.startDate);
         const badge = mk('span', 'dday-badge ' + dd.cls); badge.textContent = dd.text;
         const editBtn = mk('button', 'icon-btn');
         editBtn.textContent = '✏️'; editBtn.style.color = '#9ca3af';
