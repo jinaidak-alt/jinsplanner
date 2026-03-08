@@ -577,8 +577,12 @@
         <input type="time" id="notif-daily-time" style="padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;color:#374151;cursor:pointer;outline:none;">
       </div>
     </div>
-    <!-- 개인정보 처리방침 -->
+    <!-- 고객지원 / 개인정보 처리방침 -->
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+      <a href="https://jinaidak-alt.github.io/jinsplanner/support.html" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;text-decoration:none;cursor:pointer;">
+        <span style="font-size:14px;color:#374151;">고객지원</span>
+        <span style="font-size:13px;color:#9ca3af;">&#8599;</span>
+      </a>
       <a href="https://jinaidak-alt.github.io/jinsplanner/privacy.html" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;text-decoration:none;cursor:pointer;">
         <span style="font-size:14px;color:#374151;">개인정보 처리방침</span>
         <span style="font-size:13px;color:#9ca3af;">&#8599;</span>
@@ -2557,11 +2561,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       const appleProvider = new OAuthProvider('apple.com');
       appleProvider.addScope('email');
       appleProvider.addScope('name');
-      if (isIOS) {
-        await signInWithRedirect(auth, appleProvider);
-      } else {
-        await signInWithPopup(auth, appleProvider);
-      }
+      await signInWithPopup(auth, appleProvider);
     } catch (e) {
       console.error('[Auth] Apple 로그인 에러:', e.code, e.message);
       showAuthError(e);
