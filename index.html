@@ -2493,7 +2493,8 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isIOS = (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
+    || (navigator.userAgent.includes('Mac') && navigator.maxTouchPoints > 1);
   if (isIOS) {
     const googleBtn = document.getElementById('login-btn');
     if (googleBtn) googleBtn.style.display = 'none';
@@ -2507,7 +2508,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   }
 
   function showAuthError(e) {
-    if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') return;
+    if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/popup-blocked') return;
     console.error(e);
     const el = document.getElementById('auth-error');
     if (!el) return;
