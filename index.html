@@ -2485,7 +2485,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
 
   const firebaseConfig = {
     apiKey: "AIzaSyAKOU49vWsJILNQzutNsfmA8Jzs_nuLYog",
-    authDomain: "jinsplanner.web.app",
+    authDomain: "jinsplanner.firebaseapp.com",
     projectId: "jinsplanner",
     storageBucket: "jinsplanner.firebasestorage.app",
     messagingSenderId: "958045716171",
@@ -2565,11 +2565,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       const appleProvider = new OAuthProvider('apple.com');
       appleProvider.addScope('email');
       appleProvider.addScope('name');
-      if (isIOS) {
-        await signInWithRedirect(auth, appleProvider);
-      } else {
-        await signInWithPopup(auth, appleProvider);
-      }
+      await signInWithPopup(auth, appleProvider);
     } catch (e) {
       console.error('[Auth] Apple 로그인 에러:', e.code, e.message);
       showAuthError(e);
