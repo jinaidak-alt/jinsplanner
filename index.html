@@ -2,16 +2,16 @@
 <html lang="ko">
 <head>
   <!-- PWA -->
-  <link rel="manifest" href="/jinsplanner/manifest.json">
+  <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#6366f1">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="한걸음">
-  <link rel="apple-touch-icon" href="/jinsplanner/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>데일리 할 일</title>
+  <title>오늘도, 한 걸음</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:#f0f4f8;min-height:100vh;}
@@ -570,20 +570,21 @@
     <div id="manage-categories"></div>
     <button class="btn-secondary" id="manage-close" style="margin-top:16px">닫기</button>
     <!-- 알림 설정 -->
-    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+    <div id="notif-section" style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
       <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:12px;">알림 설정 🔔</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;">
+      <div id="notif-unsupported" style="display:none;font-size:13px;color:#9ca3af;padding:6px 0;">알림은 Safari에서만 지원됩니다.</div>
+      <div id="notif-controls" style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;">
         <label for="notif-daily-time" style="font-size:14px;color:#374151;">하루 요약 알림 시간</label>
         <input type="time" id="notif-daily-time" style="padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;color:#374151;cursor:pointer;outline:none;">
       </div>
     </div>
     <!-- 고객지원 / 개인정보 처리방침 -->
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
-      <a href="https://jinaidak-alt.github.io/jinsplanner/support.html" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;text-decoration:none;cursor:pointer;">
+      <a href="https://jinsplanner.web.app/support.html" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;text-decoration:none;cursor:pointer;">
         <span style="font-size:14px;color:#374151;">고객지원</span>
         <span style="font-size:13px;color:#9ca3af;">&#8599;</span>
       </a>
-      <a href="https://jinaidak-alt.github.io/jinsplanner/privacy.html" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;text-decoration:none;cursor:pointer;">
+      <a href="https://jinsplanner.web.app/privacy.html" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;text-decoration:none;cursor:pointer;">
         <span style="font-size:14px;color:#374151;">개인정보 처리방침</span>
         <span style="font-size:13px;color:#9ca3af;">&#8599;</span>
       </a>
@@ -2390,20 +2391,30 @@ function sendNotification(title, body) {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       // Service Worker 활성화 상태: showNotification() 사용
       navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+        reg.showNotification(title, { body, icon: '/icons/icon-192.png' });
         console.log('[알림] SW showNotification 전송 완료');
       }).catch(err => {
         console.warn('[알림] SW showNotification 실패, Notification() 폴백:', err);
-        new Notification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+        new Notification(title, { body, icon: '/icons/icon-192.png' });
       });
     } else {
-      new Notification(title, { body, icon: '/jinsplanner/icons/icon-192.png' });
+      new Notification(title, { body, icon: '/icons/icon-192.png' });
       console.log('[알림] new Notification() 전송 완료');
     }
   } catch(e) {
     console.error('[알림] Notification 생성 실패:', e);
   }
 }
+
+// 알림 미지원 환경(WKWebView 등)에서 UI 전환
+(function() {
+  if (!('Notification' in window)) {
+    const ctrl = document.getElementById('notif-controls');
+    const msg  = document.getElementById('notif-unsupported');
+    if (ctrl) ctrl.style.display = 'none';
+    if (msg)  msg.style.display  = 'block';
+  }
+})();
 
 // 작업 1: 알림 권한 요청 (비동기 처리)
 async function requestNotifPermission() {
