@@ -600,6 +600,17 @@
   </div>
 </div>
 
+<!-- TEXT FULL POPUP (모바일 탭용) -->
+<div id="text-full-popup" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.45);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;padding:20px;max-width:300px;width:88%;box-shadow:0 8px 24px rgba(0,0,0,.18);">
+    <div id="text-full-popup-cat" style="margin-bottom:10px;"></div>
+    <div id="text-full-popup-text" style="font-size:15px;font-weight:600;color:#111827;line-height:1.7;word-break:break-word;"></div>
+    <div id="text-full-popup-time" style="font-size:12px;color:#9ca3af;margin-top:6px;"></div>
+    <div id="text-full-popup-memo" style="font-size:13px;color:#6b7280;margin-top:6px;line-height:1.6;word-break:break-word;"></div>
+    <button onclick="document.getElementById('text-full-popup').style.display='none'" style="margin-top:16px;width:100%;padding:10px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">닫기</button>
+  </div>
+</div>
+
 <!-- DELETE SCOPE SHEET -->
 <div id="delete-scope-backdrop" onclick="_closeScopeSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;"></div>
 <div id="delete-scope-sheet" style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:1024px;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 40px;z-index:501;">
@@ -1004,6 +1015,21 @@ function buildRoutineItem(r, ds, opts={}) {
 
   const info = mk('div','routine-info');
   const txt  = mk('div','routine-text'); txt.textContent = r.text; txt.dataset.fullText = r.text;
+  txt.addEventListener('click', (e) => {
+    if (!window.matchMedia('(hover: none)').matches) return;
+    if (txt.scrollWidth <= txt.clientWidth) return;
+    e.stopPropagation();
+    const popup = document.getElementById('text-full-popup');
+    document.getElementById('text-full-popup-cat').innerHTML =
+      `<span style="font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:${cat.color}20;color:${cat.color}">${cat.name}</span>`;
+    document.getElementById('text-full-popup-text').textContent = r.text;
+    const ts = fmtTime(r);
+    const timeEl = document.getElementById('text-full-popup-time');
+    timeEl.textContent = ts || ''; timeEl.style.display = ts ? 'block' : 'none';
+    const memoEl = document.getElementById('text-full-popup-memo');
+    memoEl.textContent = r.memo || ''; memoEl.style.display = r.memo ? 'block' : 'none';
+    popup.style.display = 'flex';
+  });
   info.appendChild(txt);
   if (r.memo) { const mEl=mk('div','routine-memo'); mEl.textContent=r.memo; info.appendChild(mEl); }
   const timeStr = fmtTime(r);
