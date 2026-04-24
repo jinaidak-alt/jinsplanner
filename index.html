@@ -1797,7 +1797,9 @@ function renderProject() {
 function openAddModal() {
   editId=null; editTaskId=null; addTaskSlot=null;
   document.getElementById('modal-add-title').textContent='할 일 추가';
-  document.getElementById('add-task-start-date').value=todayStr();
+  // Daily 뷰에서 다른 날짜로 이동한 상태면 그 날짜를 시작일 디폴트로
+  const defaultDs = currentTab === 'daily' ? toStr(dailyDate) : todayStr();
+  document.getElementById('add-task-start-date').value=defaultDs;
   document.getElementById('add-due-date').value='';
   document.getElementById('add-text').value='';
   document.getElementById('add-time-start').value='';
@@ -1806,7 +1808,7 @@ function openAddModal() {
   document.getElementById('panel-time-input').style.display='none';
   document.querySelectorAll('.timeslot-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('add-delete').style.display='none';
-  document.getElementById('add-start-date').value=todayStr();
+  document.getElementById('add-start-date').value=defaultDs;
   document.getElementById('add-end-date').value='';
   addCatId=getCats()[0]?.id||null; addDays=[]; addDates=[];
   setRepeatType('daily'); renderCatOpts(); renderDateList();
@@ -1950,6 +1952,10 @@ function submitRoutine() {
   if (!text)                                          { alert('할 일 이름을 입력해 주세요.'); return; }
   if (addRepeatType==='weekly'   &&!addDays.length)   { alert('요일을 선택해 주세요.'); return; }
   if (addRepeatType==='specific' &&!addDates.length)  { alert('날짜를 추가해 주세요.'); return; }
+  // 종료일은 시작일보다 이전일 수 없음
+  const rStart = document.getElementById('add-start-date').value;
+  const rEnd   = document.getElementById('add-end-date').value;
+  if (rStart && rEnd && rEnd < rStart) { alert('종료일은 시작일보다 이전일 수 없습니다.'); return; }
 
   const routines=getRoutines();
   const timeInputActive = document.getElementById('panel-time-input').style.display !== 'none';
@@ -2265,8 +2271,11 @@ function setTimeMode(slot) {
 function submitTask() {
   const text      = document.getElementById('add-text').value.trim();
   const startDate = document.getElementById('add-task-start-date').value || todayStr();
-  const dueDate   = document.getElementById('add-due-date').value || '';
+  // 종료일 미설정 시 시작일과 동일하게 자동 설정
+  const dueDate   = document.getElementById('add-due-date').value || startDate;
   if (!text) { alert('할 일 이름을 입력해 주세요.'); return; }
+  // 종료일은 시작일보다 이전일 수 없음
+  if (dueDate < startDate) { alert('종료일은 시작일보다 이전일 수 없습니다.'); return; }
 
   const tasks = getTasks();
   const timeInputActive = document.getElementById('panel-time-input').style.display !== 'none';
@@ -2782,57 +2791,75 @@ function calcNotifTime(dateStr, timeStart, offsetMin) {
   return { date: toStr(notifDate), time: `${h}:${m}` };
 }
 
+// 테스크 알림 일정 선택: 명시적 시간+offset이 있으면 그걸, 아니면 하루짜리는 09:00 자동
+// null 반환 시 알림 없음
+function pickTaskSchedule(t) {
+  if (t.done) return null;
+  // 1) 시간 입력 + 알림 offset 설정된 경우
+  if (t.alarmOffset !== null && t.alarmOffset !== undefined && t.time?.start) {
+    const dateStr = t.startDate || t.dueDate || todayStr();
+    const { date, time } = calcNotifTime(dateStr, t.time.start, t.alarmOffset);
+    const isExact = t.alarmOffset === 0;
+    return {
+      date, time,
+      title: '오늘도, 한 걸음 ' + (isExact ? '🌅' : '⏰'),
+      body:  isExact ? `${t.text} 시작할 시간이에요!` : `${t.text} ${t.alarmOffset}분 후 시작해요!`,
+    };
+  }
+  // 2) 시간 미설정 + 하루짜리(시작일=종료일) → 해당일 09:00 자동 알림
+  const s = t.startDate || t.dueDate;
+  const e = t.dueDate   || t.startDate;
+  if (s && e && s === e && !t.time?.start) {
+    return {
+      date: s, time: '09:00',
+      title: '오늘도, 한 걸음 📅',
+      body:  `${t.text} 잊지 마세요!`,
+    };
+  }
+  return null;
+}
+
+// 로컬 시간 기준 과거 여부
+function isNotifPast(dateStr, timeStr) {
+  return new Date(`${dateStr}T${timeStr}:00`).getTime() <= Date.now();
+}
+
 // 작업 3: 할 일 시작 알림 스케줄러
 const _taskNotifTimers = {};
 function scheduleTaskNotifications() {
   // 네이티브 WKWebView 환경: Swift에 위임
   if (window.webkit?.messageHandlers?.scheduleTaskNotification) {
     window.webkit.messageHandlers.cancelTaskNotification?.postMessage({ all: true });
-    const targets = getTasks().filter(t =>
-      t.alarmOffset !== null && t.alarmOffset !== undefined && t.time?.start && !t.done
-    );
-    targets.forEach(t => {
-      const dateStr = t.startDate || t.dueDate || todayStr();
-      const { date, time } = calcNotifTime(dateStr, t.time.start, t.alarmOffset);
-      const isExact = t.alarmOffset === 0;
+    let count = 0;
+    getTasks().forEach(t => {
+      const sched = pickTaskSchedule(t);
+      if (!sched) return;
+      if (isNotifPast(sched.date, sched.time)) return;
       window.webkit.messageHandlers.scheduleTaskNotification.postMessage({
-        id:    t.id,
-        date,
-        time,
-        title: '오늘도, 한 걸음 ' + (isExact ? '🌅' : '⏰'),
-        body:  isExact ? `${t.text} 시작할 시간이에요!` : `${t.text} ${t.alarmOffset}분 후 시작해요!`,
+        id: t.id, date: sched.date, time: sched.time, title: sched.title, body: sched.body,
       });
+      count++;
     });
+    console.log(`[알림] 네이티브 테스크 알림 예약: ${count}개`);
     return;
   }
-  // 브라우저 환경: 기존 setTimeout 방식
+  // 브라우저 환경: setTimeout — 오늘 분만 발송 가능 (앱 닫히면 중단)
   Object.values(_taskNotifTimers).forEach(id => clearTimeout(id));
   Object.keys(_taskNotifTimers).forEach(k => delete _taskNotifTimers[k]);
   const today = todayStr();
-  const now = new Date();
-  const targets = getTasks().filter(t =>
-    (t.startDate || t.dueDate) === today &&
-    !t.done && t.time && t.time.start &&
-    t.alarmOffset !== null && t.alarmOffset !== undefined
-  );
-  console.log(`[알림] 할 일 시작 알림 등록 대상: ${targets.length}개`);
-  targets.forEach(t => {
-    const [h, m] = t.time.start.split(':').map(Number);
-    const target = new Date(); target.setHours(h, m - t.alarmOffset, 0, 0);
+  const now = Date.now();
+  let count = 0;
+  getTasks().forEach(t => {
+    const sched = pickTaskSchedule(t);
+    if (!sched) return;
+    if (sched.date !== today) return;
+    const target = new Date(`${sched.date}T${sched.time}:00`).getTime();
     const diff = target - now;
-    const isExact = t.alarmOffset === 0;
-    if (diff > 0) {
-      console.log(`[알림] "${t.text}" 알림 등록 — ${t.time.start} (offset ${t.alarmOffset}분, 약 ${Math.round(diff / 60000)}분 후)`);
-      _taskNotifTimers[t.id] = setTimeout(() => {
-        sendNotification(
-          '오늘도, 한 걸음 ' + (isExact ? '🌅' : '⏰'),
-          isExact ? `${t.text} 시작할 시간이에요!` : `${t.text} ${t.alarmOffset}분 후 시작해요!`
-        );
-      }, diff);
-    } else {
-      console.log(`[알림] "${t.text}" — 이미 지난 시간, 건너뜀`);
-    }
+    if (diff <= 0) return;
+    _taskNotifTimers[t.id] = setTimeout(() => sendNotification(sched.title, sched.body), diff);
+    count++;
   });
+  console.log(`[알림] 브라우저 테스크 알림 등록: ${count}개`);
 }
 
 // ─────────────────────────────────────────
