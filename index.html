@@ -1443,7 +1443,11 @@ function renderWeekly() {
           item.draggable = true;
           item.style.userSelect = 'none';
           item.addEventListener('dragstart', (e) => { e.dataTransfer.setData('taskId', t.id); e.dataTransfer.effectAllowed='move'; setTimeout(()=>item.classList.add('dragging'),0); });
-          item.addEventListener('dragend', () => item.classList.remove('dragging'));
+          item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            // 드롭 없이 끝난 경우(ESC 취소 등) 컬럼 강조 잔여 제거
+            document.querySelectorAll('.week-col.drag-target').forEach(c => c.classList.remove('drag-target'));
+          });
           item.append(cbtn, dot, bodyEl, editBtn);
           body.appendChild(item);
         });
@@ -1550,11 +1554,28 @@ function renderMonthly() {
   const tbody=document.createElement('tbody');
   routines.forEach(r=>{
     const cat=catById(r.categoryId); let sch=0,done=0;
-    dateStrs.forEach(ds=>{ if(routineOnDate(r,ds)&&(!r.startDate||ds>=r.startDate)&&(!r.endDate||ds<=r.endDate)){sch++;if(getChecks(ds)[r.id])done++;} });
+    dateStrs.forEach(ds=>{
+      if (!routineOnDate(r,ds)) return;
+      if (r.startDate && ds < r.startDate) return;
+      if (r.endDate   && ds > r.endDate)   return;
+      if ((r.excludedDates || []).includes(ds)) return;
+      sch++;
+      if (getChecks(ds)[r.id]) done++;
+    });
     if (!sch) return;
     const pct=Math.round(done/sch*100);
     const row=document.createElement('tr');
-    row.innerHTML=`<td><span class="sdot" style="background:${cat.color}"></span>${r.text}</td><td class="r">${sch}</td><td class="r">${done}</td><td class="r">${pct}%<div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div></td>`;
+    // 이름 셀: XSS 방지를 위해 DOM API로 구성
+    const nameTd = document.createElement('td');
+    const dot = document.createElement('span'); dot.className = 'sdot'; dot.style.background = cat.color;
+    nameTd.appendChild(dot);
+    nameTd.appendChild(document.createTextNode(r.text));
+    row.appendChild(nameTd);
+    const schTd  = document.createElement('td'); schTd.className  = 'r'; schTd.textContent  = sch;  row.appendChild(schTd);
+    const doneTd = document.createElement('td'); doneTd.className = 'r'; doneTd.textContent = done; row.appendChild(doneTd);
+    const pctTd  = document.createElement('td'); pctTd.className  = 'r';
+    pctTd.innerHTML = `${pct}%<div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div>`;
+    row.appendChild(pctTd);
     tbody.appendChild(row);
   });
   tbl.appendChild(tbody); statsEl.innerHTML=''; statsEl.appendChild(tbl);
@@ -1882,6 +1903,7 @@ function submitRoutine() {
 
   const routines=getRoutines();
   const timeInputActive = document.getElementById('panel-time-input').style.display !== 'none';
+  const prev = editId ? routines.find(r => r.id === editId) : null;
   const entry={
     id: editId||Date.now().toString(),
     text,
@@ -1894,6 +1916,9 @@ function submitRoutine() {
     repeat:{type:addRepeatType, days:[...addDays], dates:[...addDates]},
     startDate: document.getElementById('add-start-date').value || null,
     memo: document.getElementById('add-memo').value.trim() || null,
+    // 편집 시 "오늘만 수정" 제외 날짜 / 종료일 보존
+    excludedDates: prev?.excludedDates ? [...prev.excludedDates] : undefined,
+    endDate: prev?.endDate || undefined,
   };
   if (editId) {
     const idx=routines.findIndex(r=>r.id===editId);
@@ -2513,9 +2538,13 @@ document.getElementById('btn-clear-checks').onclick = () => {
   document.getElementById('clear-checks-sheet').style.display = 'block';
   document.getElementById('clear-checks-backdrop').style.display = 'block';
 };
-document.getElementById('btn-clear-all').onclick = () => {
+document.getElementById('btn-clear-all').onclick = async () => {
   if (!confirm('정말 초기화하시겠습니까?')) return;
   if (!confirm('이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?')) return;
+  if (window.clearCloudData) {
+    try { await window.clearCloudData(); }
+    catch (e) { console.error('[초기화] 클라우드 데이터 삭제 실패:', e); alert('클라우드 데이터 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.'); return; }
+  }
   localStorage.clear(); location.reload();
 };
 
@@ -2675,8 +2704,8 @@ function calcNotifTime(dateStr, timeStart, offsetMin) {
   notifDate.setMinutes(notifDate.getMinutes() - offsetMin);
   const h = String(notifDate.getHours()).padStart(2, '0');
   const m = String(notifDate.getMinutes()).padStart(2, '0');
-  const d = notifDate.toISOString().slice(0, 10);
-  return { date: d, time: `${h}:${m}` };
+  // toISOString()은 UTC 기준이라 로컬 새벽 시간에 하루 앞당겨지는 버그가 있어 toStr() 재사용
+  return { date: toStr(notifDate), time: `${h}:${m}` };
 }
 
 // 작업 3: 할 일 시작 알림 스케줄러
@@ -2684,7 +2713,7 @@ const _taskNotifTimers = {};
 function scheduleTaskNotifications() {
   // 네이티브 WKWebView 환경: Swift에 위임
   if (window.webkit?.messageHandlers?.scheduleTaskNotification) {
-    window.webkit.messageHandlers.cancelTaskNotification.postMessage({ all: true });
+    window.webkit.messageHandlers.cancelTaskNotification?.postMessage({ all: true });
     const targets = getTasks().filter(t =>
       t.alarmOffset !== null && t.alarmOffset !== undefined && t.time?.start && !t.done
     );
@@ -2707,19 +2736,27 @@ function scheduleTaskNotifications() {
   Object.keys(_taskNotifTimers).forEach(k => delete _taskNotifTimers[k]);
   const today = todayStr();
   const now = new Date();
-  const targets = getTasks().filter(t => (t.startDate || t.dueDate) === today && !t.done && t.time && t.time.start);
+  const targets = getTasks().filter(t =>
+    (t.startDate || t.dueDate) === today &&
+    !t.done && t.time && t.time.start &&
+    t.alarmOffset !== null && t.alarmOffset !== undefined
+  );
   console.log(`[알림] 할 일 시작 알림 등록 대상: ${targets.length}개`);
   targets.forEach(t => {
     const [h, m] = t.time.start.split(':').map(Number);
-    const target = new Date(); target.setHours(h, m, 0, 0);
+    const target = new Date(); target.setHours(h, m - t.alarmOffset, 0, 0);
     const diff = target - now;
+    const isExact = t.alarmOffset === 0;
     if (diff > 0) {
-      console.log(`[알림] "${t.text}" 알림 등록 — ${t.time.start} (약 ${Math.round(diff / 60000)}분 후)`);
+      console.log(`[알림] "${t.text}" 알림 등록 — ${t.time.start} (offset ${t.alarmOffset}분, 약 ${Math.round(diff / 60000)}분 후)`);
       _taskNotifTimers[t.id] = setTimeout(() => {
-        sendNotification('오늘도, 한 걸음 🌅', `${t.text} 시작할 시간이에요!`);
+        sendNotification(
+          '오늘도, 한 걸음 ' + (isExact ? '🌅' : '⏰'),
+          isExact ? `${t.text} 시작할 시간이에요!` : `${t.text} ${t.alarmOffset}분 후 시작해요!`
+        );
       }, diff);
     } else {
-      console.log(`[알림] "${t.text}" — 이미 지난 시간(${t.time.start}), 건너뜀`);
+      console.log(`[알림] "${t.text}" — 이미 지난 시간, 건너뜀`);
     }
   });
 }
@@ -2744,7 +2781,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, linkWithPopup, signInWithCredential, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+  import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signOut, onAuthStateChanged, linkWithPopup, signInWithCredential, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -2794,14 +2831,6 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       + 'style="margin-left:6px;padding:2px 8px;border:1px solid #ef4444;border-radius:6px;background:white;color:#ef4444;font-size:11px;cursor:pointer;">주소 복사</button>';
     el.style.display = 'block';
   }
-
-  // 리다이렉트 로그인 결과 처리 (페이지 복귀 시)
-  getRedirectResult(auth).then((result) => {
-    if (result) console.log('[Auth] 리다이렉트 로그인 성공:', result.user?.email);
-  }).catch((e) => {
-    console.error('[Auth] getRedirectResult 에러:', e.code, e.message);
-    showAuthError(e);
-  });
 
   // 로그인 함수
   window.googleLogin = async () => {
@@ -3145,21 +3174,26 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       if (userInfo) userInfo.textContent = (user.displayName || user.email || '사용자') + '님';
       renderLinkedAccounts(user);
 
-      // Firestore에서 데이터 불러오기
-      const docRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.appData) {
-          const parsed = JSON.parse(data.appData);
-          ['cats','routines','checks','notes','tasks','skips','notifSettings','routineOrder','taskOrder'].forEach(key => {
-            if (parsed[key]) localStorage.setItem(key, parsed[key]);
-          });
-          if (window.renderCurrent) renderCurrent();
-          if (window.scheduleDailySummary) window.scheduleDailySummary();
-          if (window.scheduleTaskNotifications) window.scheduleTaskNotifications();
-          console.log('[Firebase] 데이터 로드 후 알림 재스케줄 완료');
+      // Firestore에서 데이터 불러오기 — 로드 중 saveToCloud 차단 (race condition 방지)
+      window._loadingCloud = true;
+      try {
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.appData) {
+            const parsed = JSON.parse(data.appData);
+            ['cats','routines','checks','notes','tasks','skips','notifSettings','routineOrder','taskOrder'].forEach(key => {
+              if (parsed[key]) localStorage.setItem(key, parsed[key]);
+            });
+            if (window.renderCurrent) renderCurrent();
+            if (window.scheduleDailySummary) window.scheduleDailySummary();
+            if (window.scheduleTaskNotifications) window.scheduleTaskNotifications();
+            console.log('[Firebase] 데이터 로드 후 알림 재스케줄 완료');
+          }
         }
+      } finally {
+        window._loadingCloud = false;
       }
     } else {
       // 로그아웃 상태
@@ -3175,6 +3209,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
   window.saveToCloud = async () => {
     const user = auth.currentUser;
     if (!user) return;
+    if (window._loadingCloud) return; // 로드 중 저장 방지 (race condition)
     const appData = JSON.stringify({
       cats:          localStorage.getItem('cats'),
       routines:      localStorage.getItem('routines'),
@@ -3186,14 +3221,27 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       routineOrder:  localStorage.getItem('routineOrder'),
       taskOrder:     localStorage.getItem('taskOrder'),
     });
-    await setDoc(doc(db, 'users', user.uid), { appData });
+    try {
+      await setDoc(doc(db, 'users', user.uid), { appData });
+    } catch (e) {
+      console.error('[Firebase] 클라우드 저장 실패:', e.code, e.message);
+      const el = document.getElementById('auth-error');
+      if (el) { el.textContent = '클라우드 저장 실패: ' + (e.message || e.code || '알 수 없는 오류'); el.style.display = 'block'; }
+    }
+  };
+
+  // 전체 데이터 초기화용 — Firestore 문서 삭제
+  window.clearCloudData = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid));
   };
 </script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
-        .register('/jinsplanner/sw.js')
+        .register('/sw.js')
         .then((reg) => console.log('[SW] 등록 성공:', reg.scope))
         .catch((err) => console.error('[SW] 등록 실패:', err));
     });

@@ -1,11 +1,11 @@
-const CACHE_NAME = 'jinsplanner-v20';
+const CACHE_NAME = 'jinsplanner-v21';
 
 const ASSETS = [
-  '/jinsplanner/',
-  '/jinsplanner/index.html',
-  '/jinsplanner/manifest.json',
-  '/jinsplanner/icons/icon-192.png',
-  '/jinsplanner/icons/icon-512.png'
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -42,8 +42,8 @@ self.addEventListener('fetch', (e) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
           return response;
         }
-        return caches.match('/jinsplanner/index.html');
-      }).catch(() => caches.match('/jinsplanner/index.html'))
+        return caches.match('/index.html');
+      }).catch(() => caches.match('/index.html'))
     );
     return;
   }
@@ -56,7 +56,7 @@ self.addEventListener('fetch', (e) => {
         const responseClone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
         return response;
-      }).catch(() => caches.match('/jinsplanner/index.html'));
+      }).catch(() => caches.match('/index.html'));
     })
   );
 });
