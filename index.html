@@ -304,8 +304,6 @@
     .proj-routine-row.done .proj-routine-text{text-decoration:line-through;color:#c4c9d4;}
     .proj-routine-row.done{opacity:.6;}
     .repeat-badge{flex-shrink:0;font-size:11px;padding:2px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;}
-    /* ── Weekly PC wide ── */
-    .app.weekly-active{max-width:1024px;}
     .routine-memo{font-size:11px;color:#9ca3af;margin-top:2px;white-space:pre-wrap;word-break:break-all;}
   </style>
 </head>
@@ -543,10 +541,13 @@
       <div class="date-list" id="add-date-list"></div>
     </div>
 
-    <!-- ── Routine start date ── -->
+    <!-- ── Routine start/end date ── -->
     <div class="form-group" id="panel-start-date">
-      <label class="form-label">시작일 <span style="font-weight:400;color:#9ca3af">(선택)</span></label>
-      <input class="form-input" id="add-start-date" type="date"/>
+      <label class="form-label">기간 <span style="font-weight:400;color:#9ca3af">(선택)</span></label>
+      <div class="form-row">
+        <input class="form-input" id="add-start-date" type="date" placeholder="시작일"/>
+        <input class="form-input" id="add-end-date"   type="date" placeholder="종료일"/>
+      </div>
     </div>
 
     <!-- ── Task-specific fields (단발 테스크) ── -->
@@ -582,6 +583,7 @@
     <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">이 할 일을 어떻게 수정할까요?</div>
     <div style="display:flex;flex-direction:column;gap:10px;">
       <button id="repeat-choice-all" style="padding:12px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">전체 수정</button>
+      <button id="repeat-choice-from-today" style="padding:12px;background:#eef2ff;color:#6366f1;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">오늘부터 변경</button>
       <button id="repeat-choice-today" style="padding:12px;background:#f3f4f6;color:#374151;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">오늘만 수정</button>
       <button id="repeat-choice-cancel" style="padding:10px;background:none;color:#9ca3af;border:none;font-size:14px;cursor:pointer;">취소</button>
     </div>
@@ -594,6 +596,11 @@
     <div class="handle"></div>
     <div class="modal-title">카테고리 관리</div>
     <div id="manage-categories"></div>
+    <!-- 종료된 반복 할일 복구 -->
+    <div id="ended-routines-section" style="display:none;margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+      <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:12px;">종료된 반복 할일</div>
+      <div id="ended-routines-list"></div>
+    </div>
     <button class="btn-secondary" id="manage-close" style="margin-top:16px">닫기</button>
     <!-- 알림 설정 -->
     <div id="notif-section" style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
@@ -605,6 +612,8 @@
       </div>
       <button id="notif-test-btn" onclick="window._testNativeNotif && window._testNativeNotif()" style="display:none;margin-top:10px;width:100%;padding:10px;background:#f3f4f6;color:#374151;border:none;border-radius:10px;font-size:13px;cursor:pointer;">5초 후 테스트 알림 보내기 🔔</button>
     </div>
+    <!-- PWA 설치 버튼 (beforeinstallprompt 가능 시에만 노출) -->
+    <button id="btn-install-pwa" style="display:none;width:100%;margin-top:20px;padding:11px;background:#eef2ff;color:#6366f1;border:1.5px solid #c7d2fe;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">📱 홈 화면에 추가</button>
     <!-- 고객지원 / 개인정보 처리방침 -->
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
       <a href="https://jinsplanner.web.app/support.html" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;text-decoration:none;cursor:pointer;">
@@ -906,9 +915,6 @@ let editId   = null;
 let editCatId = null;
 let selColor  = PALETTE[4];
 
-// Manage tab
-let manageTab = 'routines';
-
 // Task modal state
 let addType     = 'routine';
 let addTaskSlot = null;
@@ -945,8 +951,8 @@ function saveNoteFor(ds, text) {
 // Tasks storage (단발 테스크)
 const getTasks  = () => JSON.parse(localStorage.getItem('tasks') || '[]');
 const saveTasks = t  => { localStorage.setItem('tasks', JSON.stringify(t)); if (window.saveToCloud) saveToCloud(); scheduleTaskNotifications(); };
+// skips는 excludedDates로 통합됨. 레거시 데이터(다른 기기에서 동기화된 구버전) 호환 위해 getter만 유지
 const getSkips  = () => JSON.parse(localStorage.getItem('skips') || '{}');
-const saveSkips = s  => { localStorage.setItem('skips', JSON.stringify(s)); if (window.saveToCloud) saveToCloud(); };
 
 // Notification settings storage
 const getNotifSettings  = () => JSON.parse(localStorage.getItem('notifSettings') || '{"dailyTime":"09:00"}');
@@ -954,7 +960,24 @@ const saveNotifSettings = s  => { localStorage.setItem('notifSettings', JSON.str
 
 const getRoutineOrder  = () => JSON.parse(localStorage.getItem('routineOrder') || '[]');
 const saveRoutineOrder = o  => { localStorage.setItem('routineOrder', JSON.stringify(o)); if (window.saveToCloud) saveToCloud(); };
-const getTaskOrder     = () => JSON.parse(localStorage.getItem('taskOrder') || '[]');
+// taskOrder: 날짜+슬롯별 순서 저장 — { "2026-04-24": { "morning": [id, ...], "_none": [...] } }
+// 구버전(배열)은 무시하고 빈 객체로 시작
+function getTaskOrder() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('taskOrder') || '{}');
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  } catch { return {}; }
+}
+function saveTaskOrder(o) { localStorage.setItem('taskOrder', JSON.stringify(o)); if (window.saveToCloud) saveToCloud(); }
+function getTaskSlotOrder(ds, slotKey) {
+  return (getTaskOrder()[ds] || {})[slotKey || '_none'] || [];
+}
+function saveTaskSlotOrder(ds, slotKey, ids) {
+  const order = getTaskOrder();
+  if (!order[ds]) order[ds] = {};
+  order[ds][slotKey || '_none'] = ids;
+  saveTaskOrder(order);
+}
 
 // ─────────────────────────────────────────
 // Date helpers
@@ -1013,9 +1036,19 @@ const routinesForDate = ds => {
 };
 const catById = id => getCats().find(c=>c.id===id) || {name:'기타',color:'#6b7280'};
 
+// 테스크가 특정 날짜에 표시되어야 하는지 (시작일~종료일 범위 포함, 문자열 비교)
+function taskVisibleOnDate(t, ds) {
+  const start = t.startDate || t.dueDate;
+  const end   = t.dueDate   || t.startDate;
+  if (!start && !end) return false;
+  if (start && ds < start) return false;
+  if (end   && ds > end)   return false;
+  return true;
+}
+
 function achievement(ds) {
   const rs       = routinesForDate(ds);
-  const dayTasks = getTasks().filter(t => (t.startDate || t.dueDate) === ds);
+  const dayTasks = getTasks().filter(t => taskVisibleOnDate(t, ds));
   const total    = rs.length + dayTasks.length;
   if (!total) return null;
   const ck = getChecks(ds);
@@ -1268,7 +1301,7 @@ function renderDaily() {
   document.getElementById('daily-today-btn').style.display = isToday ? 'none' : 'inline-block';
 
   const rs=routinesForDate(ds), ck=getChecks(ds);
-  const dayTasks=getTasks().filter(t=>(t.startDate||t.dueDate)===ds);
+  const dayTasks=getTasks().filter(t=>taskVisibleOnDate(t,ds));
   const done=rs.filter(r=>ck[r.id]).length + dayTasks.filter(t=>t.done).length;
   const total=rs.length + dayTasks.length;
   const pct=total?Math.round(done/total*100):0;
@@ -1350,7 +1383,7 @@ function renderWeekly() {
     const isToday = ds===today;
     const rs       = routinesForDate(ds);
     const ck       = getChecks(ds);
-    const dayTasks = getTasks().filter(t => (t.startDate || t.dueDate) === ds);
+    const dayTasks = getTasks().filter(t => taskVisibleOnDate(t, ds));
     const done     = rs.filter(r=>ck[r.id]).length + dayTasks.filter(t=>t.done).length;
     const total    = rs.length + dayTasks.length;
     const pct      = total?Math.round(done/total*100):0;
@@ -1774,6 +1807,7 @@ function openAddModal() {
   document.querySelectorAll('.timeslot-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('add-delete').style.display='none';
   document.getElementById('add-start-date').value=todayStr();
+  document.getElementById('add-end-date').value='';
   addCatId=getCats()[0]?.id||null; addDays=[]; addDates=[];
   setRepeatType('daily'); renderCatOpts(); renderDateList();
   setAddType('task');
@@ -1828,6 +1862,19 @@ function openEditRoutineTodayOnly(routineId, ds) {
   document.getElementById('modal-add').classList.add('open');
 }
 
+// "오늘부터 변경" — 원 루틴을 어제로 종료시키고 오늘부터 새 루틴 생성
+// 편집 모달을 편집-기반으로 열지만 저장 시 새 루틴으로 만들어짐
+function openEditRoutineFromToday(id, ds) {
+  openEditModal(id);
+  editId = null; // 새 루틴으로 저장되도록
+  _fromTodayOriginalId = id;
+  _fromTodayDs = ds;
+  document.getElementById('modal-add-title').textContent = '오늘부터 변경';
+  document.getElementById('add-delete').style.display = 'none';
+  document.getElementById('add-start-date').value = ds;
+  document.getElementById('add-end-date').value   = '';
+}
+
 function openEditModal(id) {
   const r=getRoutines().find(x=>x.id===id);
   if (!r) return;
@@ -1837,6 +1884,7 @@ function openEditModal(id) {
   document.getElementById('add-memo').value=r.memo||'';
   document.getElementById('add-delete').style.display='block';
   document.getElementById('add-start-date').value = r.startDate || '';
+  document.getElementById('add-end-date').value   = r.endDate   || '';
   addCatId=r.categoryId;
   addDays  =(r.repeat?.type==='weekly')  ?[...r.repeat.days]  :[];
   addDates =(r.repeat?.type==='specific')?[...r.repeat.dates] :[];
@@ -1863,6 +1911,8 @@ function closeAddModal() {
   document.getElementById('modal-add').classList.remove('open');
   _todayOnlyRoutineId = null;
   _todayOnlyDs = null;
+  _fromTodayOriginalId = null;
+  _fromTodayDs = null;
 }
 
 function setRepeatType(type) {
@@ -1915,15 +1965,24 @@ function submitRoutine() {
     timeSlot: timeInputActive ? null : addTaskSlot,
     repeat:{type:addRepeatType, days:[...addDays], dates:[...addDates]},
     startDate: document.getElementById('add-start-date').value || null,
+    endDate:   document.getElementById('add-end-date').value   || null,
     memo: document.getElementById('add-memo').value.trim() || null,
-    // 편집 시 "오늘만 수정" 제외 날짜 / 종료일 보존
+    // 편집 시 "오늘만 수정" 제외 날짜 보존
     excludedDates: prev?.excludedDates ? [...prev.excludedDates] : undefined,
-    endDate: prev?.endDate || undefined,
   };
   if (editId) {
     const idx=routines.findIndex(r=>r.id===editId);
     if (idx!==-1) routines[idx]=entry;
   } else { routines.push(entry); }
+  // "오늘부터 변경": 원 루틴 endDate를 기준일 하루 전으로 설정
+  if (_fromTodayOriginalId && _fromTodayDs) {
+    const origIdx = routines.findIndex(r => r.id === _fromTodayOriginalId);
+    if (origIdx !== -1) {
+      const d = new Date(_fromTodayDs + 'T00:00:00');
+      d.setDate(d.getDate() - 1);
+      routines[origIdx].endDate = toStr(d);
+    }
+  }
   saveRoutines(routines);
   closeAddModal(); renderCurrent();
 }
@@ -1936,6 +1995,8 @@ let _pendingEditRoutineId = null;
 let _pendingEditDs = null;
 let _todayOnlyRoutineId = null;
 let _todayOnlyDs = null;
+let _fromTodayOriginalId = null;
+let _fromTodayDs = null;
 
 function _openScopeSheet() {
   document.getElementById('delete-scope-backdrop').style.display = 'block';
@@ -1947,10 +2008,13 @@ function _closeScopeSheet() {
 }
 
 function delScopeOnlyToday() {
-  const skips = getSkips();
-  if (!skips[_scopeTargetDs]) skips[_scopeTargetDs] = [];
-  if (!skips[_scopeTargetDs].includes(_scopeTargetId)) skips[_scopeTargetDs].push(_scopeTargetId);
-  saveSkips(skips);
+  const routines = getRoutines();
+  const idx = routines.findIndex(r => r.id === _scopeTargetId);
+  if (idx !== -1) {
+    if (!routines[idx].excludedDates) routines[idx].excludedDates = [];
+    if (!routines[idx].excludedDates.includes(_scopeTargetDs)) routines[idx].excludedDates.push(_scopeTargetDs);
+    saveRoutines(routines);
+  }
   _closeScopeSheet(); closeAddModal(); renderCurrent();
 }
 function delScopeFromToday() {
@@ -1981,10 +2045,12 @@ function deleteCurrentRoutine() {
 
 function skipForDay(ds, routineId) {
   if (!confirm('오늘만 이 항목을 숨길까요?')) return;
-  const skips = getSkips();
-  if (!skips[ds]) skips[ds] = [];
-  if (!skips[ds].includes(routineId)) skips[ds].push(routineId);
-  saveSkips(skips);
+  const routines = getRoutines();
+  const idx = routines.findIndex(r => r.id === routineId);
+  if (idx === -1) return;
+  if (!routines[idx].excludedDates) routines[idx].excludedDates = [];
+  if (!routines[idx].excludedDates.includes(ds)) routines[idx].excludedDates.push(ds);
+  saveRoutines(routines);
   renderCurrent();
 }
 
@@ -1993,38 +2059,43 @@ function skipForDay(ds, routineId) {
 // ─────────────────────────────────────────
 function openManageModal() {
   renderManageCategories();
+  renderEndedRoutines();
   document.getElementById('notif-daily-time').value = getNotifSettings().dailyTime || '09:00';
   if (window.renderLinkedAccounts) window.renderLinkedAccounts(window._currentUser || null);
   document.getElementById('modal-manage').classList.add('open');
 }
-function closeManageModal(){ document.getElementById('modal-manage').classList.remove('open'); }
 
-function renderManageRoutines() {
-  const routines=getRoutines(), el=document.getElementById('manage-routines');
-  if (!routines.length){ el.innerHTML='<div class="empty" style="padding:20px 0">등록된 할 일이 없습니다</div>'; return; }
-  el.innerHTML='';
-  routines.forEach(r=>{
-    const cat=catById(r.categoryId);
-    const repType=r.repeat?.type||'daily';
-    const rdesc=repType==='daily'?'매일'
-      :repType==='weekly'?r.repeat.days.map(d=>DAY_KR[d]).join('·')+'요일'
-      :`${r.repeat.dates.length}일 지정`;
-    const timeStr=fmtTime(r);
-    const item=mk('div','manage-item');
-    const dot=mk('div','dot'); dot.style.background=cat.color;
-    const txt=mk('div','manage-text');
-    txt.innerHTML=`<div class="manage-name">${r.text}</div><div class="manage-sub">${cat.name} · ${rdesc}${timeStr?' · '+timeStr:''}</div>`;
-    const editBtn=mk('button','icon-btn'); editBtn.textContent='✏️'; editBtn.style.color='#9ca3af';
-    editBtn.onclick=()=>{ closeManageModal(); openEditModal(r.id); };
-    const delBtn=mk('button','icon-btn'); delBtn.textContent='×'; delBtn.style.fontSize='20px';
-    delBtn.onclick=()=>{
-      if (!confirm(`"${r.text}"을(를) 삭제하시겠습니까?`)) return;
-      saveRoutines(getRoutines().filter(x=>x.id!==r.id));
-      renderManageRoutines(); renderCurrent();
+function renderEndedRoutines() {
+  const section = document.getElementById('ended-routines-section');
+  const listEl  = document.getElementById('ended-routines-list');
+  const today   = todayStr();
+  const ended   = getRoutines().filter(r => r.endDate && r.endDate < today);
+  if (!ended.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  listEl.innerHTML = '';
+  ended.forEach(r => {
+    const cat  = catById(r.categoryId);
+    const item = mk('div', 'manage-item');
+    const dot  = mk('div', 'dot'); dot.style.background = cat.color;
+    const txt  = mk('div', 'manage-text');
+    const name = mk('div', 'manage-name'); name.textContent = r.text;
+    const sub  = mk('div', 'manage-sub');  sub.textContent  = `${cat.name} · ${r.endDate} 종료`;
+    txt.append(name, sub);
+    const restoreBtn = mk('button', 'btn-secondary');
+    restoreBtn.textContent = '복구';
+    restoreBtn.style.cssText = 'width:auto;padding:6px 14px;margin-top:0;font-size:13px;flex-shrink:0;';
+    restoreBtn.onclick = () => {
+      const routines = getRoutines();
+      const idx = routines.findIndex(x => x.id === r.id);
+      if (idx !== -1) { delete routines[idx].endDate; saveRoutines(routines); }
+      renderEndedRoutines();
+      renderCurrent();
     };
-    item.append(dot,txt,editBtn,delBtn); el.appendChild(item);
+    item.append(dot, txt, restoreBtn);
+    listEl.appendChild(item);
   });
 }
+function closeManageModal(){ document.getElementById('modal-manage').classList.remove('open'); }
 
 function renderManageCategories() {
   const el=document.getElementById('manage-categories'); el.innerHTML='';
@@ -2340,7 +2411,7 @@ function buildTaskItem(t) {
 }
 
 function renderDailyTasks(ds) {
-  const tasks   = getTasks().filter(t => (t.startDate || t.dueDate) === ds);
+  const tasks   = getTasks().filter(t => taskVisibleOnDate(t, ds));
   const section = document.getElementById('daily-tasks-section');
   const listEl  = document.getElementById('daily-tasks-list');
 
@@ -2364,12 +2435,12 @@ function renderDailyTasks(ds) {
       {key:'evening',   label:'🌙 저녁'},
       {key:null,        label:'⏱ 시간대 미정'},
     ];
-    const tOrder = getTaskOrder();
     SLOTS.forEach(({key, label}) => {
       const group = tasks.filter(t => (t.timeSlot || null) === key);
       if (!group.length) return;
+      const slotOrder = getTaskSlotOrder(ds, key);
       group.sort((a, b) => {
-        const ai = tOrder.indexOf(a.id), bi = tOrder.indexOf(b.id);
+        const ai = slotOrder.indexOf(a.id), bi = slotOrder.indexOf(b.id);
         if (ai !== -1 && bi !== -1) return ai - bi;
         if (ai !== -1) return -1;
         if (bi !== -1) return 1;
@@ -2384,12 +2455,7 @@ function renderDailyTasks(ds) {
         wrap.appendChild(item);
       });
       listEl.appendChild(wrap);
-      addDragDrop(wrap, (slotIds) => {
-        const slotSet = new Set(slotIds);
-        const merged = [...getTaskOrder().filter(id => !slotSet.has(id)), ...slotIds];
-        localStorage.setItem('taskOrder', JSON.stringify(merged));
-        if (window.saveToCloud) saveToCloud();
-      });
+      addDragDrop(wrap, (slotIds) => saveTaskSlotOrder(ds, key, slotIds));
     });
   }
 }
@@ -2404,7 +2470,6 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     currentTab=btn.dataset.tab;
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b===btn));
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+currentTab));
-    document.querySelector('.app').classList.toggle('weekly-active', currentTab==='weekly');
     renderCurrent();
   };
 });
@@ -2480,6 +2545,11 @@ document.getElementById('repeat-choice-all').onclick = () => {
   _editContextDs = ds;
   openEditModal(id);
 };
+document.getElementById('repeat-choice-from-today').onclick = () => {
+  const id = _pendingEditRoutineId, ds = _pendingEditDs;
+  closeRepeatChoice();
+  openEditRoutineFromToday(id, ds);
+};
 document.getElementById('repeat-choice-today').onclick = () => {
   const id = _pendingEditRoutineId, ds = _pendingEditDs;
   closeRepeatChoice();
@@ -2545,7 +2615,11 @@ document.getElementById('btn-clear-all').onclick = async () => {
     try { await window.clearCloudData(); }
     catch (e) { console.error('[초기화] 클라우드 데이터 삭제 실패:', e); alert('클라우드 데이터 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.'); return; }
   }
-  localStorage.clear(); location.reload();
+  // 사용자 취향(정렬 모드) 등 앱 설정은 데이터 초기화와 무관 — 보존
+  const savedSort = localStorage.getItem('dailySortMode');
+  localStorage.clear();
+  if (savedSort) localStorage.setItem('dailySortMode', savedSort);
+  location.reload();
 };
 
 // Backdrop close
@@ -2766,6 +2840,27 @@ function scheduleTaskNotifications() {
 // ─────────────────────────────────────────
 console.log('[앱] 메인 스크립트 실행 시작');
 if (!localStorage.getItem('cats')) saveCats(DEFAULT_CATS);
+
+// skips → excludedDates 마이그레이션 (단일 스킵 저장소로 통합)
+// localStorage 직접 조작 후 루틴만 saveRoutines로 클라우드 동기화 트리거
+(function migrateSkipsToExcludedDates() {
+  const skips = JSON.parse(localStorage.getItem('skips') || '{}');
+  if (!Object.keys(skips).length) return;
+  const routines = getRoutines();
+  let changed = false;
+  Object.entries(skips).forEach(([ds, ids]) => {
+    (ids || []).forEach(rid => {
+      const r = routines.find(x => x.id === rid);
+      if (!r) return;
+      if (!r.excludedDates) r.excludedDates = [];
+      if (!r.excludedDates.includes(ds)) { r.excludedDates.push(ds); changed = true; }
+    });
+  });
+  localStorage.setItem('skips', '{}');
+  if (changed) saveRoutines(routines);
+  console.log('[마이그레이션] skips → excludedDates 완료');
+})();
+
 renderCurrent();
 
 // Firebase 모듈 스크립트에서도 호출할 수 있도록 window에 노출
@@ -2887,10 +2982,11 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
     } catch { return { routines: 0, tasks: 0, checks: 0 }; }
   }
 
-  function _renderMergeCard(elId, label, emoji, appDataStr, keepCurrentValue) {
+  function _renderMergeCard(elId, label, emoji, appDataStr, keepCurrentValue, confirmFn) {
     const s = _parseMergeStats(appDataStr);
     const el = document.getElementById(elId);
     if (!el) return;
+    const fn = confirmFn || 'confirmMerge';
     el.innerHTML = `
       <div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:12px;">${emoji} ${label}</div>
       <div style="font-size:13px;color:#374151;line-height:2.1;">
@@ -2898,7 +2994,7 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
         테스크 <strong>${s.tasks}개</strong><br>
         기록 <strong>${s.checks}일치</strong>
       </div>
-      <button onclick="confirmMerge(${keepCurrentValue})"
+      <button onclick="${fn}(${keepCurrentValue})"
         style="width:100%;margin-top:14px;padding:10px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">
         이 데이터 유지
       </button>`;
@@ -2938,6 +3034,61 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
     }
   }
 
+  // 로컬 vs 클라우드 데이터 병합 (로그인 시 기기와 클라우드 데이터가 다를 때)
+  let _lcLocalAppData = null;
+  let _lcCloudAppData = null;
+  function buildLocalAppData() {
+    return JSON.stringify({
+      cats: localStorage.getItem('cats'), routines: localStorage.getItem('routines'),
+      checks: localStorage.getItem('checks'), notes: localStorage.getItem('notes'),
+      tasks: localStorage.getItem('tasks'), skips: localStorage.getItem('skips'),
+      notifSettings: localStorage.getItem('notifSettings'),
+      routineOrder: localStorage.getItem('routineOrder'), taskOrder: localStorage.getItem('taskOrder'),
+    });
+  }
+  function hasLocalData() {
+    try {
+      const r = JSON.parse(localStorage.getItem('routines') || '[]');
+      const t = JSON.parse(localStorage.getItem('tasks')    || '[]');
+      return r.length > 0 || t.length > 0;
+    } catch { return false; }
+  }
+  function localCloudDataDiffers(localStr, cloudStr) {
+    const a = _parseMergeStats(localStr);
+    const b = _parseMergeStats(cloudStr);
+    return a.routines !== b.routines || a.tasks !== b.tasks || a.checks !== b.checks;
+  }
+  function applyAppData(appDataStr) {
+    const parsed = JSON.parse(appDataStr);
+    ['cats','routines','checks','notes','tasks','skips','notifSettings','routineOrder','taskOrder'].forEach(key => {
+      if (parsed[key]) localStorage.setItem(key, parsed[key]);
+      else localStorage.removeItem(key);
+    });
+  }
+  async function startLocalCloudMergeFlow(localAppDataStr, cloudAppDataStr) {
+    window._lcMerging = true;
+    _lcLocalAppData = localAppDataStr;
+    _lcCloudAppData = cloudAppDataStr;
+    _renderMergeCard('merge-card-current', '이 기기',  '📱', localAppDataStr, true,  'confirmLocalCloudMerge');
+    _renderMergeCard('merge-card-other',   '클라우드', '☁️', cloudAppDataStr, false, 'confirmLocalCloudMerge');
+    document.getElementById('merge-sheet').style.display = 'block';
+    document.getElementById('merge-backdrop').style.display = 'block';
+  }
+  window.confirmLocalCloudMerge = async (keepLocal) => {
+    _closeMergeSheet();
+    const picked = keepLocal ? _lcLocalAppData : _lcCloudAppData;
+    applyAppData(picked);
+    if (keepLocal) {
+      // 로컬 선택 — 클라우드 덮어쓰기
+      if (window.saveToCloud) await window.saveToCloud();
+    }
+    _lcLocalAppData = null; _lcCloudAppData = null;
+    window._lcMerging = false;
+    if (window.renderCurrent) renderCurrent();
+    if (window.scheduleDailySummary) window.scheduleDailySummary();
+    if (window.scheduleTaskNotifications) window.scheduleTaskNotifications();
+  };
+
   function _closeMergeSheet() {
     document.getElementById('merge-sheet').style.display = 'none';
     document.getElementById('merge-backdrop').style.display = 'none';
@@ -2950,6 +3101,14 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
 
   window.cancelMerge = async () => {
     _closeMergeSheet();
+    // 로컬/클라우드 병합 취소 시에는 클라우드 데이터 채택 (기본 동작)
+    if (window._lcMerging) {
+      if (_lcCloudAppData) applyAppData(_lcCloudAppData);
+      _lcLocalAppData = null; _lcCloudAppData = null;
+      window._lcMerging = false;
+      if (window.renderCurrent) renderCurrent();
+      return;
+    }
     window._isMerging = false;
     _resetMergeState();
     await signOut(auth);
@@ -3179,18 +3338,23 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       try {
         const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.appData) {
-            const parsed = JSON.parse(data.appData);
-            ['cats','routines','checks','notes','tasks','skips','notifSettings','routineOrder','taskOrder'].forEach(key => {
-              if (parsed[key]) localStorage.setItem(key, parsed[key]);
-            });
-            if (window.renderCurrent) renderCurrent();
-            if (window.scheduleDailySummary) window.scheduleDailySummary();
-            if (window.scheduleTaskNotifications) window.scheduleTaskNotifications();
-            console.log('[Firebase] 데이터 로드 후 알림 재스케줄 완료');
-          }
+        const cloudAppData = (docSnap.exists() && docSnap.data().appData) || null;
+        const localHad = hasLocalData();
+        const localAppData = localHad ? buildLocalAppData() : null;
+        if (cloudAppData && localHad && localCloudDataDiffers(localAppData, cloudAppData)) {
+          // 로컬·클라우드 둘 다 의미 있는 데이터 + 서로 다름 → 사용자 선택
+          await startLocalCloudMergeFlow(localAppData, cloudAppData);
+        } else if (cloudAppData) {
+          applyAppData(cloudAppData);
+          if (window.renderCurrent) renderCurrent();
+          if (window.scheduleDailySummary) window.scheduleDailySummary();
+          if (window.scheduleTaskNotifications) window.scheduleTaskNotifications();
+          console.log('[Firebase] 클라우드 데이터 로드 완료');
+        } else if (localHad) {
+          // 클라우드 비어있고 로컬에 데이터 있음 → 자동 업로드
+          window._loadingCloud = false; // 업로드 허용
+          if (window.saveToCloud) await window.saveToCloud();
+          console.log('[Firebase] 로컬 데이터를 클라우드에 업로드 완료');
         }
       } finally {
         window._loadingCloud = false;
@@ -3250,6 +3414,31 @@ console.log('[앱] 알림 스케줄러 초기화 완료');
       window.location.reload();
     });
   }
+
+  // PWA 설치 프롬프트 (Chrome/Edge 등) — iOS Safari는 beforeinstallprompt 미지원이라 자동 숨김
+  let _deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    const btn = document.getElementById('btn-install-pwa');
+    if (btn) btn.style.display = 'block';
+  });
+  window.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btn-install-pwa');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      if (!_deferredInstallPrompt) return;
+      _deferredInstallPrompt.prompt();
+      try { await _deferredInstallPrompt.userChoice; } catch {}
+      _deferredInstallPrompt = null;
+      btn.style.display = 'none';
+    });
+  });
+  window.addEventListener('appinstalled', () => {
+    _deferredInstallPrompt = null;
+    const btn = document.getElementById('btn-install-pwa');
+    if (btn) btn.style.display = 'none';
+  });
 </script>
 </body>
 </html>
