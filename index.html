@@ -59,6 +59,14 @@
     .routine-item.done .routine-text{text-decoration:line-through;color:#9ca3af;}
     .routine-time{font-size:12px;color:#9ca3af;margin-top:2px;}
     .cat-badge{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:500;flex-shrink:0;}
+    .routine-cat-label{font-size:11px;font-weight:600;margin-bottom:3px;letter-spacing:.2px;}
+
+    /* ── Streak toast ── */
+    .streak-toast{position:fixed;top:22%;left:50%;transform:translateX(-50%) translateY(-12px) scale(.94);background:linear-gradient(135deg,#fb923c 0%,#ea580c 60%,#dc2626 100%);color:#fff;padding:20px 24px;border-radius:18px;text-align:center;box-shadow:0 14px 36px rgba(234,88,12,.4);z-index:999;opacity:0;transition:opacity .28s ease,transform .32s cubic-bezier(.34,1.56,.64,1);max-width:320px;width:calc(100% - 60px);pointer-events:none;cursor:pointer;}
+    .streak-toast.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1);pointer-events:auto;}
+    .streak-toast .st-fire{font-size:38px;line-height:1;}
+    .streak-toast .st-num{font-size:22px;font-weight:800;margin-top:4px;letter-spacing:-.4px;}
+    .streak-toast .st-msg{font-size:13px;font-weight:500;margin-top:6px;line-height:1.55;opacity:.96;}
     .icon-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;border-radius:6px;line-height:1;color:#d1d5db;flex-shrink:0;transition:color .2s;}
     .icon-btn:hover{color:#6b7280;}
     .empty{text-align:center;padding:36px 0;color:#9ca3af;font-size:14px;line-height:1.8;}
@@ -513,6 +521,20 @@
       </div>
     </div>
 
+    <div class="form-group" id="panel-record-completion-time" style="display:none">
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:13px;font-weight:600;color:#374151;">
+        <span>완료 시각 기록 <span style="font-weight:400;color:#9ca3af;font-size:12px;">(체크할 때 시각 저장)</span></span>
+        <input type="checkbox" id="add-record-completion-time" style="width:18px;height:18px;cursor:pointer;accent-color:#6366f1;"/>
+      </label>
+    </div>
+
+    <div class="form-group" id="panel-enable-streak" style="display:none">
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:13px;font-weight:600;color:#374151;">
+        <span>스트릭 표시 🔥 <span style="font-weight:400;color:#9ca3af;font-size:12px;">(연속 완료 일수)</span></span>
+        <input type="checkbox" id="add-enable-streak" style="width:18px;height:18px;cursor:pointer;accent-color:#6366f1;"/>
+      </label>
+    </div>
+
     <div class="form-group" id="panel-repeat-main">
       <label class="form-label">반복 설정</label>
       <div class="repeat-opts">
@@ -675,6 +697,33 @@
     <button onclick="delScopeAll()" style="flex:1;padding:12px;background:#fef2f2;color:#ef4444;border:none;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;">전체 삭제</button>
   </div>
   <button onclick="_closeScopeSheet()" style="width:100%;margin-top:12px;background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:8px;">취소</button>
+</div>
+
+<!-- STREAK ACHIEVEMENT TOAST -->
+<div id="streak-toast" class="streak-toast"></div>
+
+<!-- STREAK SCOPE SHEET (기존 루틴에 스트릭 켤 때) -->
+<div id="streak-scope-backdrop" onclick="_closeStreakScopeSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;"></div>
+<div id="streak-scope-sheet" style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:1024px;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 40px;z-index:501;">
+  <div style="width:38px;height:4px;background:#e5e7eb;border-radius:999px;margin:0 auto 18px;"></div>
+  <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:8px;">스트릭 적용 범위</div>
+  <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">기존 체크 기록을 스트릭에 어떻게 반영할까요?</div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <button onclick="_streakScopeFromToday()" style="padding:12px;background:#eef2ff;color:#6366f1;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">오늘부터 적용</button>
+    <button onclick="_streakScopeAll()" style="padding:12px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">전체 적용</button>
+    <button onclick="_closeStreakScopeSheet()" style="padding:10px;background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">취소</button>
+  </div>
+</div>
+
+<!-- EDIT CHECK TIME SHEET -->
+<div id="edit-check-time-backdrop" onclick="_closeCheckTimeSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;"></div>
+<div id="edit-check-time-sheet" style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:1024px;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 40px;z-index:501;">
+  <div style="width:38px;height:4px;background:#e5e7eb;border-radius:999px;margin:0 auto 18px;"></div>
+  <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:8px;">완료 시각 수정</div>
+  <div id="edit-check-time-name" style="font-size:13px;color:#6b7280;margin-bottom:16px;"></div>
+  <input type="time" id="edit-check-time-input" style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;margin-bottom:16px;">
+  <button onclick="_confirmCheckTime()" style="width:100%;padding:12px;background:#6366f1;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;">저장</button>
+  <button onclick="_closeCheckTimeSheet()" style="width:100%;padding:12px;background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;">취소</button>
 </div>
 
 <!-- CLEAR CHECKS SHEET -->
@@ -933,7 +982,7 @@ function saveChecks(ds, obj) {
   const all = getAllChecks();
   all[ds] = obj;
   const keys = Object.keys(all).sort();
-  if (keys.length > 120) keys.slice(0, keys.length-120).forEach(k=>delete all[k]);
+  if (keys.length > 1000) keys.slice(0, keys.length-1000).forEach(k=>delete all[k]);
   localStorage.setItem('checks', JSON.stringify(all));
   if (window.saveToCloud) saveToCloud();
 }
@@ -1066,11 +1115,128 @@ function fmtTime(r) {
 // ─────────────────────────────────────────
 function toggleCheck(ds, rid) {
   const ck=getChecks(ds);
-  if (ck[rid]) delete ck[rid]; else ck[rid]=true;
+  const wasChecked = !!ck[rid];
+  const r = getRoutines().find(x => x.id === rid);
+  if (wasChecked) {
+    delete ck[rid];
+  } else {
+    if (r?.recordCompletionTime && ds === todayStr()) {
+      const now = new Date();
+      ck[rid] = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    } else {
+      ck[rid] = true;
+    }
+  }
   saveChecks(ds,ck);
+  // 새로 체크됨 + 스트릭 활성 + 1~10일 매일 / 그 이후 10일마다 토스트
+  if (!wasChecked && r?.enableStreak) {
+    const streak = computeStreak(r);
+    if (streak >= 1 && (streak <= 10 || streak % 10 === 0)) {
+      showStreakToast(streak);
+    }
+  }
   renderCurrent();
   // also refresh detail panel if open
   if (selectedMonthDate===ds) renderDetailPanel(ds);
+}
+
+// 스트릭 응원 메시지 — 1~10일은 매일, 그 이후는 10일마다
+const STREAK_MESSAGES = {
+  1:   '시작! 첫 한 걸음 멋지게 디뎠어요 🚀',
+  2:   '이틀째! 엔진에 시동 걸렸어요 🔥',
+  3:   '3일 돌파! 삼일도 못 간다는 건 옛말이에요 💥',
+  4:   '4일 연속! 페이스 제대로 살아있어요 🏃',
+  5:   '닷새 클리어! 가속 페달 밟을 시간이에요 ⚡',
+  6:   '엿새 돌파! 거침없이 달리고 있어요 🌪️',
+  7:   '일주일 정복! 첫 트로피 획득 🏆',
+  8:   '8일째! 누구도 못 막을 기세에요 🚂',
+  9:   '9일! 두 자릿수가 코앞이에요 💪',
+  10:  '🎉 10일 입성! 두 자릿수 클럽 환영해요!',
+  20:  '20일?! 이건 실력이에요, 진짜 멋져요 💎',
+  30:  '30일 뚫었어요! 한 달의 챔피언 🏅',
+  50:  '50일! 미친듯이 달리고 있어요 🚀',
+  100: '🏅 100일! 진짜배기, 인증합니다!',
+  200: '200일?! 당신은 이제 전설이에요 ⚡🌟',
+};
+
+let _streakToastTimer = null;
+function showStreakToast(streak) {
+  const msg = STREAK_MESSAGES[streak] || `멈출 줄을 모르네요!`;
+  const toast = document.getElementById('streak-toast');
+  if (!toast) return;
+  toast.innerHTML = `
+    <div class="st-fire">🔥</div>
+    <div class="st-num">${streak}일 연속</div>
+    <div class="st-msg">${msg}</div>
+  `;
+  toast.classList.add('show');
+  if (_streakToastTimer) clearTimeout(_streakToastTimer);
+  _streakToastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  toast.onclick = () => {
+    toast.classList.remove('show');
+    if (_streakToastTimer) clearTimeout(_streakToastTimer);
+  };
+}
+
+// 루틴 스트릭 계산 — 오늘 기준 연속 완료 일수
+// - 예정일(routineOnDate)만 체크 대상으로 카운트
+// - excludedDates는 카운팅에서 빠지되 스트릭은 끊지 않음
+// - 오늘 예정인데 미체크면 끊지 않고 어제부터 계산 (오늘은 아직 진행 중)
+// - 미완료 예정일을 만나면 스트릭 종료
+function computeStreak(r) {
+  if (!r.enableStreak) return 0;
+  let streak = 0;
+  const today = todayStr();
+  const start = new Date(today + 'T00:00:00');
+  for (let i = 0; i < 180; i++) { // checks 보존 한계(120일)보다 여유
+    const d = new Date(start); d.setDate(start.getDate() - i);
+    const ds = toStr(d);
+    if (r.streakStartDate && ds < r.streakStartDate) break;
+    if (r.startDate       && ds < r.startDate)       break;
+    if (r.endDate         && ds > r.endDate)         continue;
+    if (!routineOnDate(r, ds))                       continue;
+    if ((r.excludedDates || []).includes(ds))        continue;
+    if (getChecks(ds)[r.id]) {
+      streak++;
+    } else {
+      if (ds === today) continue; // 오늘은 아직 미완료여도 스트릭 유지
+      break;
+    }
+  }
+  return streak;
+}
+
+// 완료 시각 수정 시트
+let _editCheckTimeDs = null;
+let _editCheckTimeRid = null;
+function openEditCheckTime(ds, rid) {
+  const r = getRoutines().find(x => x.id === rid);
+  if (!r) return;
+  const ck = getChecks(ds);
+  const cur = typeof ck[rid] === 'string' ? ck[rid] : '';
+  _editCheckTimeDs = ds;
+  _editCheckTimeRid = rid;
+  document.getElementById('edit-check-time-name').textContent = `${r.text} · ${ds}`;
+  document.getElementById('edit-check-time-input').value = cur || '';
+  document.getElementById('edit-check-time-backdrop').style.display = 'block';
+  document.getElementById('edit-check-time-sheet').style.display = 'block';
+}
+function _closeCheckTimeSheet() {
+  document.getElementById('edit-check-time-backdrop').style.display = 'none';
+  document.getElementById('edit-check-time-sheet').style.display = 'none';
+  _editCheckTimeDs = null;
+  _editCheckTimeRid = null;
+}
+function _confirmCheckTime() {
+  const v = document.getElementById('edit-check-time-input').value;
+  if (!/^\d{2}:\d{2}$/.test(v)) { alert('시각을 선택해 주세요.'); return; }
+  const ck = getChecks(_editCheckTimeDs);
+  ck[_editCheckTimeRid] = v;
+  saveChecks(_editCheckTimeDs, ck);
+  const ds = _editCheckTimeDs;
+  _closeCheckTimeSheet();
+  renderCurrent();
+  if (selectedMonthDate === ds) renderDetailPanel(ds);
 }
 
 // ─────────────────────────────────────────
@@ -1092,6 +1258,9 @@ function buildRoutineItem(r, ds, opts={}) {
   cb.onclick = () => toggleCheck(ds, r.id);
 
   const info = mk('div','routine-info');
+  const catLabel = mk('div','routine-cat-label');
+  catLabel.textContent = cat.name; catLabel.style.color = cat.color;
+  info.appendChild(catLabel);
   const txt  = mk('div','routine-text'); txt.textContent = r.text; txt.dataset.fullText = r.text;
   txt.addEventListener('click', (e) => {
     if (!window.matchMedia('(hover: none)').matches) return;
@@ -1110,16 +1279,39 @@ function buildRoutineItem(r, ds, opts={}) {
   });
   info.appendChild(txt);
   if (r.memo) { const mEl=mk('div','routine-memo'); mEl.textContent=r.memo; info.appendChild(mEl); }
-  const timeStr = fmtTime(r);
-  if (timeStr) { const tEl=mk('div','routine-time'); tEl.textContent=timeStr; info.appendChild(tEl); }
+  const stamp = typeof ck[r.id] === 'string' ? ck[r.id] : null;
+  // 미체크이거나 타임스탬프 미사용일 때만 예정 시각 표시 (체크된 타임스탬프는 우측 칩으로 이동)
+  if (!isDone || !stamp) {
+    const timeStr = fmtTime(r);
+    if (timeStr) { const tEl=mk('div','routine-time'); tEl.textContent=timeStr; info.appendChild(tEl); }
+  }
 
-  const badge = mk('span','cat-badge');
-  badge.textContent=cat.name; badge.style.background=cat.color+'20'; badge.style.color=cat.color;
+  el.append(bar, cb, info);
 
-  el.append(bar, cb, info, badge);
+  if (isDone && stamp) {
+    const tsBadge = mk('span','cat-badge');
+    tsBadge.textContent = `✓${stamp}`;
+    tsBadge.style.background = '#eef2ff';
+    tsBadge.style.color = '#6366f1';
+    tsBadge.style.fontWeight = '600';
+    tsBadge.style.cursor = 'pointer';
+    tsBadge.title = '탭하여 수정';
+    tsBadge.onclick = (e) => { e.stopPropagation(); openEditCheckTime(ds, r.id); };
+    el.appendChild(tsBadge);
+  }
+
+  const streak = computeStreak(r);
+  if (streak > 0) {
+    const sBadge = mk('span','cat-badge');
+    sBadge.textContent = `🔥${streak}`;
+    sBadge.style.background = '#fff7ed';
+    sBadge.style.color = '#ea580c';
+    sBadge.title = `연속 ${streak}일`;
+    el.appendChild(sBadge);
+  }
 
   if (showEdit) {
-    const skipBtn = mk('button','icon-btn'); skipBtn.textContent='🚫'; skipBtn.style.fontSize='13px';
+    const skipBtn = mk('button','icon-btn'); skipBtn.textContent='😴'; skipBtn.style.fontSize='13px';
     skipBtn.onclick = () => skipForDay(ds, r.id);
     el.appendChild(skipBtn);
     const editBtn = mk('button','icon-btn'); editBtn.textContent='✏️'; editBtn.style.color='#9ca3af';
@@ -1146,11 +1338,12 @@ function buildOverdueItem(t) {
   cb.style.background  = t.done ? cat.color : '#fff';
   cb.onclick = () => toggleTaskDone(t.id);
   const info = mk('div', 'routine-info');
+  const catLabel = mk('div','routine-cat-label'); catLabel.textContent = cat.name; catLabel.style.color = cat.color;
+  info.appendChild(catLabel);
   const txt  = mk('div', 'routine-text'); txt.textContent = t.text; info.appendChild(txt);
   const dEl  = mk('div', 'routine-time'); dEl.textContent = `${daysBetween(t.dueDate, todayStr())}일 전 마감`; dEl.style.color = '#ef4444'; info.appendChild(dEl);
-  const badge = mk('span', 'cat-badge'); badge.textContent = cat.name; badge.style.background = cat.color+'20'; badge.style.color = cat.color;
   const editBtn = mk('button', 'icon-btn'); editBtn.textContent = '✏️'; editBtn.style.color = '#9ca3af'; editBtn.onclick = () => openEditTaskModal(t.id);
-  el.append(bar, cb, info, badge, editBtn);
+  el.append(bar, cb, info, editBtn);
   return el;
 }
 
@@ -1164,10 +1357,12 @@ function buildUrgentItem(t, label, barColor, timeColor) {
   cb.style.background  = t.done ? cat.color : '#fff';
   cb.onclick = () => toggleTaskDone(t.id);
   const info = mk('div', 'routine-info');
+  const catLabel = mk('div','routine-cat-label'); catLabel.textContent = cat.name; catLabel.style.color = cat.color;
+  info.appendChild(catLabel);
   const txt  = mk('div', 'routine-text'); txt.textContent = t.text; info.appendChild(txt);
   const dEl  = mk('div', 'routine-time'); dEl.textContent = label; dEl.style.color = timeColor; info.appendChild(dEl);
-  const badge = mk('span', 'cat-badge'); badge.textContent = cat.name; badge.style.background = cat.color+'20'; badge.style.color = cat.color;
-  if (t.timeSlot) { const sb = mk('span', 'task-slot-badge'); sb.textContent = SLOT_LABEL[t.timeSlot]||''; el.append(bar, cb, info, badge, sb); } else { el.append(bar, cb, info, badge); }
+  el.append(bar, cb, info);
+  if (t.timeSlot) { const sb = mk('span', 'task-slot-badge'); sb.textContent = SLOT_LABEL[t.timeSlot]||''; el.appendChild(sb); }
   const editBtn = mk('button', 'icon-btn'); editBtn.textContent = '✏️'; editBtn.style.color = '#9ca3af'; editBtn.onclick = () => openEditTaskModal(t.id);
   el.appendChild(editBtn);
   return el;
@@ -1811,6 +2006,8 @@ function openAddModal() {
   document.getElementById('add-start-date').value=defaultDs;
   document.getElementById('add-end-date').value='';
   addCatId=getCats()[0]?.id||null; addDays=[]; addDates=[];
+  document.getElementById('add-record-completion-time').checked = false;
+  document.getElementById('add-enable-streak').checked = false;
   setRepeatType('daily'); renderCatOpts(); renderDateList();
   setAddType('task');
   document.getElementById('modal-add').classList.add('open');
@@ -1890,6 +2087,8 @@ function openEditModal(id) {
   addCatId=r.categoryId;
   addDays  =(r.repeat?.type==='weekly')  ?[...r.repeat.days]  :[];
   addDates =(r.repeat?.type==='specific')?[...r.repeat.dates] :[];
+  document.getElementById('add-record-completion-time').checked = !!r.recordCompletionTime;
+  document.getElementById('add-enable-streak').checked = !!r.enableStreak;
   setRepeatType(r.repeat?.type||'daily'); renderCatOpts(); renderDateList();
   // 시간 설정 복원
   addTaskSlot = r.timeSlot || null;
@@ -1960,6 +2159,7 @@ function submitRoutine() {
   const routines=getRoutines();
   const timeInputActive = document.getElementById('panel-time-input').style.display !== 'none';
   const prev = editId ? routines.find(r => r.id === editId) : null;
+  const enableStreak = document.getElementById('add-enable-streak').checked;
   const entry={
     id: editId||Date.now().toString(),
     text,
@@ -1973,13 +2173,39 @@ function submitRoutine() {
     startDate: document.getElementById('add-start-date').value || null,
     endDate:   document.getElementById('add-end-date').value   || null,
     memo: document.getElementById('add-memo').value.trim() || null,
+    recordCompletionTime: document.getElementById('add-record-completion-time').checked,
+    enableStreak,
+    streakStartDate: prev?.streakStartDate || null, // 기본은 기존 값 유지
     // 편집 시 "오늘만 수정" 제외 날짜 보존
     excludedDates: prev?.excludedDates ? [...prev.excludedDates] : undefined,
   };
+
+  // 새 루틴 + 스트릭 ON → 시작일(또는 오늘)부터 자연스럽게
+  if (!prev && enableStreak) {
+    entry.streakStartDate = entry.startDate || todayStr();
+  }
+
+  // 편집 + 스트릭 OFF→ON → 적용 범위 선택 시트
+  const wasEnabled = !!prev?.enableStreak;
+  if (prev && !wasEnabled && enableStreak) {
+    _pendingStreakEntry   = entry;
+    _pendingStreakRoutines = routines;
+    _openStreakScopeSheet();
+    return; // 시트 선택 후 _commitRoutineEntry()로 저장
+  }
+
+  _commitRoutineEntry(entry, routines);
+  closeAddModal(); renderCurrent();
+}
+
+// 루틴 entry 저장 공통 로직 — submitRoutine과 스트릭 시트에서 공유
+function _commitRoutineEntry(entry, routines) {
   if (editId) {
-    const idx=routines.findIndex(r=>r.id===editId);
-    if (idx!==-1) routines[idx]=entry;
-  } else { routines.push(entry); }
+    const idx = routines.findIndex(r => r.id === editId);
+    if (idx !== -1) routines[idx] = entry;
+  } else {
+    routines.push(entry);
+  }
   // "오늘부터 변경": 원 루틴 endDate를 기준일 하루 전으로 설정
   if (_fromTodayOriginalId && _fromTodayDs) {
     const origIdx = routines.findIndex(r => r.id === _fromTodayOriginalId);
@@ -1990,6 +2216,38 @@ function submitRoutine() {
     }
   }
   saveRoutines(routines);
+}
+
+// 스트릭 적용 범위 시트
+let _pendingStreakEntry    = null;
+let _pendingStreakRoutines = null;
+function _openStreakScopeSheet() {
+  document.getElementById('streak-scope-backdrop').style.display = 'block';
+  document.getElementById('streak-scope-sheet').style.display    = 'block';
+}
+function _closeStreakScopeSheet() {
+  document.getElementById('streak-scope-backdrop').style.display = 'none';
+  document.getElementById('streak-scope-sheet').style.display    = 'none';
+  _pendingStreakEntry    = null;
+  _pendingStreakRoutines = null;
+  // 모달은 그대로 두고 사용자가 다시 결정하도록 — 저장 무효화
+}
+function _streakScopeFromToday() {
+  if (!_pendingStreakEntry) return;
+  _pendingStreakEntry.streakStartDate = todayStr();
+  _commitRoutineEntry(_pendingStreakEntry, _pendingStreakRoutines);
+  _pendingStreakEntry = null; _pendingStreakRoutines = null;
+  document.getElementById('streak-scope-backdrop').style.display = 'none';
+  document.getElementById('streak-scope-sheet').style.display    = 'none';
+  closeAddModal(); renderCurrent();
+}
+function _streakScopeAll() {
+  if (!_pendingStreakEntry) return;
+  _pendingStreakEntry.streakStartDate = null; // 무제한 — 전체 체크 사용
+  _commitRoutineEntry(_pendingStreakEntry, _pendingStreakRoutines);
+  _pendingStreakEntry = null; _pendingStreakRoutines = null;
+  document.getElementById('streak-scope-backdrop').style.display = 'none';
+  document.getElementById('streak-scope-sheet').style.display    = 'none';
   closeAddModal(); renderCurrent();
 }
 
@@ -2050,7 +2308,7 @@ function deleteCurrentRoutine() {
 }
 
 function skipForDay(ds, routineId) {
-  if (!confirm('오늘만 이 항목을 숨길까요?')) return;
+  if (!confirm('오늘은 쉴까요? 😴')) return;
   const routines = getRoutines();
   const idx = routines.findIndex(r => r.id === routineId);
   if (idx === -1) return;
@@ -2243,6 +2501,8 @@ function setAddType(type) {
   }
   document.getElementById('panel-repeat-main').style.display = type === 'routine' ? 'block' : 'none';
   document.getElementById('panel-start-date').style.display  = type === 'routine' ? 'block' : 'none';
+  document.getElementById('panel-record-completion-time').style.display = type === 'routine' ? 'block' : 'none';
+  document.getElementById('panel-enable-streak').style.display           = type === 'routine' ? 'block' : 'none';
   if (type === 'task') {
     document.getElementById('panel-weekly').style.display   = 'none';
     document.getElementById('panel-specific').style.display = 'none';
@@ -2388,16 +2648,13 @@ function buildTaskItem(t) {
   cb.onclick = () => toggleTaskDone(t.id);
 
   const info = mk('div', 'routine-info');
+  const catLabel = mk('div','routine-cat-label'); catLabel.textContent = cat.name; catLabel.style.color = cat.color;
+  info.appendChild(catLabel);
   const txt  = mk('div', 'routine-text'); txt.textContent = t.text;
   info.appendChild(txt);
   if (t.memo) { const mEl=mk('div','routine-memo'); mEl.textContent=t.memo; info.appendChild(mEl); }
 
-  const badge = mk('span', 'cat-badge');
-  badge.textContent      = cat.name;
-  badge.style.background = cat.color + '20';
-  badge.style.color      = cat.color;
-
-  el.append(bar, cb, info, badge);
+  el.append(bar, cb, info);
 
   if (t.timeSlot) {
     const slotBadge = mk('span', 'task-slot-badge');
@@ -2580,6 +2837,18 @@ document.getElementById('add-date-input').onchange=e=>{
   if (v&&!addDates.includes(v)){ addDates.push(v); addDates.sort(); renderDateList(); }
   e.target.value='';
 };
+// 시작일이 종료일보다 뒤면 종료일을 시작일과 동일하게 자동 보정
+document.getElementById('add-start-date').onchange = e => {
+  const s = e.target.value;
+  const endEl = document.getElementById('add-end-date');
+  if (s && endEl.value && endEl.value < s) endEl.value = s;
+};
+document.getElementById('add-task-start-date').onchange = e => {
+  const s = e.target.value;
+  const dueEl = document.getElementById('add-due-date');
+  if (s && dueEl.value && dueEl.value < s) dueEl.value = s;
+};
+
 document.getElementById('add-submit').onclick = submitRoutine;
 document.getElementById('add-cancel').onclick = closeAddModal;
 document.getElementById('add-delete').onclick = deleteCurrentRoutine;
@@ -2889,6 +3158,58 @@ if (!localStorage.getItem('cats')) saveCats(DEFAULT_CATS);
 })();
 
 renderCurrent();
+
+// 일회성 마이그레이션 — jinaida.k@gmail.com 계정 '공복 러닝' 스트릭
+// 사용자가 콘솔에서 migrateRunningStreak() 직접 호출
+window.migrateRunningStreak = async function() {
+  if (window._currentUser?.email !== 'jinaida.k@gmail.com') {
+    alert('이 마이그레이션은 jinaida.k@gmail.com 계정에서만 실행 가능합니다.');
+    return;
+  }
+  if (localStorage.getItem('_migrated_running_streak')) {
+    alert('이미 실행된 마이그레이션입니다.');
+    return;
+  }
+  if (!confirm('"공복 러닝" 루틴에 2026-01-19부터 오늘까지 주중 완료 기록을 추가합니다. 진행할까요?')) return;
+
+  const routines = getRoutines();
+  const r = routines.find(x => x.text === '공복 러닝');
+  if (!r) { alert('"공복 러닝" 루틴을 찾을 수 없습니다.'); return; }
+
+  // 스트릭 활성화 + 시작일 설정
+  r.enableStreak     = true;
+  r.streakStartDate  = '2026-01-19';
+  saveRoutines(routines);
+
+  // 체크 추가 — saveChecks를 거치지 않고 localStorage 직접 조작 (자르기 회피)
+  const allChecks = JSON.parse(localStorage.getItem('checks') || '{}');
+  const start = new Date('2026-01-19T00:00:00');
+  const end   = new Date(todayStr() + 'T00:00:00');
+  let added = 0, skippedExcluded = 0, skippedExisting = 0, weekendSkipped = 0;
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) { weekendSkipped++; continue; }
+    const ds = toStr(d);
+    if ((r.excludedDates || []).includes(ds)) { skippedExcluded++; continue; }
+    if (!allChecks[ds]) allChecks[ds] = {};
+    if (allChecks[ds][r.id]) { skippedExisting++; continue; }
+    allChecks[ds][r.id] = true;
+    added++;
+  }
+  localStorage.setItem('checks', JSON.stringify(allChecks));
+  localStorage.setItem('_migrated_running_streak', new Date().toISOString());
+  if (window.saveToCloud) await window.saveToCloud();
+  if (window.renderCurrent) renderCurrent();
+
+  const summary =
+    `마이그레이션 완료\n\n` +
+    `체크 추가: ${added}일\n` +
+    `이미 체크되어 있던 날: ${skippedExisting}일\n` +
+    `건너뛰기로 제외된 날: ${skippedExcluded}일\n` +
+    `(주말 ${weekendSkipped}일은 자동 제외)`;
+  console.log(summary);
+  alert(summary);
+};
 
 // Firebase 모듈 스크립트에서도 호출할 수 있도록 window에 노출
 window.scheduleDailySummary     = scheduleDailySummary;
