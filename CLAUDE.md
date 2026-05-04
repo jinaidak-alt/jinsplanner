@@ -73,10 +73,21 @@ Swift가 `WKScriptMessageHandler`로 5개 핸들러 등록해야 함:
 JS 측에서는 핸들러 존재 여부로 분기 (네이티브 경로 vs 브라우저 setTimeout 경로).
 
 ### 루틴·테스크 이원 구조
-- **루틴 (반복)**: `repeat: {type, days, dates}`, `startDate`/`endDate`, `excludedDates[]`
+- **루틴 (반복)**: `repeat: {type, days, dates}`, `startDate`/`endDate`, `excludedDates[]`, `recordCompletionTime`(완료 시각 저장 옵트인), `enableStreak`/`streakStartDate`(스트릭 옵트인 + 적용 범위)
 - **테스크 (단발)**: `startDate`, `dueDate`, `alarmOffset`, `done`
 - "오늘만 수정"은 루틴의 `excludedDates` 추가 + 일회성 테스크 생성으로 구현
 - "오늘부터 변경"은 루틴 `endDate`를 어제로 + 새 루틴 생성
+
+### 체크 데이터 형태
+- `checks[ds][rid]`: `true` (기본) 또는 `"HH:MM"` 문자열 (`recordCompletionTime: true`인 루틴 + 당일 체크 시)
+- 자동 정리 한도: **1000일** (`saveChecks` 내부, 2026-05-04 변경 — 이전 120일)
+
+### 스트릭 (옵션, 2026-05-04 추가)
+- `routine.enableStreak === true`일 때만 카드 우측 `🔥N` 뱃지 표시
+- `streakStartDate` 이전 체크는 카운트 제외 (기존 루틴에 토글 켤 때 "오늘부터 / 전체" 시트로 결정)
+- `excludedDates` 날·예정 안 된 날(`routineOnDate(r,ds)===false`)은 카운팅 제외하되 스트릭은 끊지 않음
+- 오늘 미체크여도 스트릭 유지 (어제까지 연속이면)
+- 체크 시 `1~10일`은 매일, 이후 `10일 단위`에 응원 토스트 (`STREAK_MESSAGES` + 폴백)
 
 ## 주의사항
 
@@ -107,8 +118,8 @@ API 키에 referrer 화이트리스트가 걸려 있음. 허용 목록:
 - 실기기: iPhone (iOS WKWebView), iPad
 - 프리뷰 채널 쓸 땐 API 키 referrer 제한 해결부터
 
-## 현재 외부 의존성 상태 (2026-04-24 기준)
+## 현재 외부 의존성 상태 (2026-05-04 기준)
 
 - Firebase SDK 12.10.0 (CDN)
 - 앱 버전: 1.1 (App Store 심사 제출 완료, 2026-03-21)
-- Service Worker 캐시: `jinsplanner-v21`
+- Service Worker 캐시: `jinsplanner-v27`

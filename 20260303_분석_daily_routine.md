@@ -77,6 +77,8 @@ index.html
 | | 반복 할일 수정 범위 선택 | 수정 버튼 탭 시 "전체 수정 / 오늘부터 변경 / 오늘만 수정" 선택 다이얼로그 / 오늘만 수정: 해당 날짜를 루틴 `excludedDates`에 추가 + 수정 내용을 일회성 테스크로 저장 / 오늘부터 변경: 원 루틴 `endDate`를 어제로 + 오늘부터 새 루틴 생성 / 전체 수정: 기존 루틴 편집 동작 유지 |
 | | 편집 모달 종료일 필드 | 루틴 수정 시 시작일과 함께 종료일(선택) 입력 가능 |
 | | 종료된 루틴 복구 | 관리 모달 "종료된 반복 할일" 섹션에서 복구 버튼 (endDate 제거) |
+| | 스트릭 표시 (옵트인) | 루틴별 `enableStreak` 토글 / 카드 우측 `🔥N` 뱃지 (오늘 기준 연속 완료) / 1~10일은 매일·이후 10일마다 응원 토스트 / 기존 루틴에 켤 때 "오늘부터 / 전체" 적용 범위 시트 / `streakStartDate` 이전 체크는 카운트 제외 |
+| | 완료 시각 기록 (옵트인) | 루틴별 `recordCompletionTime` 토글 / ON이면 체크 시 `checks[ds][rid] = "HH:MM"` 저장 / 카드 우측 `✓HH:MM` 칩으로 표시 / 칩 탭하면 시각 편집 시트 |
 | **태스크 (단발)** | 추가 / 수정 / 삭제 | 이름, 시간, 카테고리, 마감일, 시간대(오전/오후/저녁) |
 | | 완료 토글 | Daily 뷰에서 가능 |
 | | 이월 섹션 | 마감일 초과 미완료 태스크 Daily 상단에 자동 표시 |
@@ -105,7 +107,7 @@ index.html
 | | Weekly 날짜 간 태스크 이동 | Weekly 뷰에서 태스크를 다른 날짜 컬럼으로 드래그하여 날짜 변경 |
 | **데이터** | localStorage 저장 | 루틴·카테고리·체크·노트·태스크·알림설정·루틴순서·태스크순서·정렬모드 각각 분리 저장 (skips는 excludedDates로 통합되어 레거시 호환만) |
 | | 완료 기록 날짜 범위 초기화 | 날짜 범위 지정 후 해당 기간의 체크 기록 일괄 삭제 |
-| | 체크 자동 정리 | 120일 초과 시 오래된 데이터 자동 삭제 |
+| | 체크 자동 정리 | 1000일 초과 시 오래된 데이터 자동 삭제 (2026-05-04 한도 상향, 이전 120일) |
 | | 로컬·클라우드 충돌 선택 | 로그인 시 로컬과 클라우드 데이터가 다르면 merge-sheet("이 기기 📱 vs 클라우드 ☁️")로 사용자 선택 |
 | | 전체 초기화 시 Firestore 동반 삭제 | 클라우드 문서 `users/{uid}` 삭제 후 로컬 초기화 (재로그인 복원 방지). 정렬 모드(`dailySortMode`)는 보존 |
 | **인증·동기화** | Google 로그인 | Firebase Authentication — 구글 계정으로 리다이렉트 로그인/로그아웃 |
@@ -254,3 +256,4 @@ index.html
 | **2026-03-21** | 반복 할일 수정 범위 선택 기능 추가 | — | 반복 할일 ✏️ 탭 시 "전체 수정 / 오늘만 수정" 다이얼로그 표시 / 오늘만 수정: 해당 날짜를 루틴 `excludedDates` 배열에 추가(이후 해당 날짜엔 루틴 미표시) + 수정 내용을 일회성 테스크로 신규 저장 / 전체 수정: 기존 루틴 수정 모달 동작 유지 / `showRepeatEditChoice()`, `openEditRoutineTodayOnly()` 함수 추가 / `routinesForDate()` 필터에 `excludedDates` 조건 추가 |
 | **2026-04-24** | QA 전수 점검 + 이슈 25건 일괄 수정 | `22705d9`, `fa0121a`, `e17f341` | Critical/High/Medium/Low 전 영역 점검 리포트 작성([20260424_QA_report.md](20260424_QA_report.md)) 후 일괄 반영. **Critical 7건**: SW 등록 경로 `/jinsplanner/` → `/` 단일화(Firebase Hosting) / "전체 데이터 초기화" 시 Firestore 문서도 삭제 / `calcNotifTime` UTC 날짜 버그 → 로컬 `toStr()` 재사용(새벽 알림이 전날로 예약되던 문제) / Monthly 통계 테이블 innerHTML XSS → DOM API 전환 / 반복 루틴 편집 시 `excludedDates`·`endDate` 보존 / 브라우저 task 알림에 `alarmOffset` 필터 + offset 적용. **High 6건**: `_loadingCloud` 플래그로 Firestore 로드 중 저장 차단(race condition) / Monthly 통계에 `excludedDates` 체크 / `saveToCloud` 에러 캐치·알림 / `cancelTaskNotification?.` 방어 / 불필요한 `getRedirectResult` 블록·import 제거 / Weekly 드래그 `dragend`에서 drag-target 잔여 정리. **Medium 10건**: `skips` → `routine.excludedDates` 통합 + 마이그레이션 / 편집 모달 종료일 필드 + 관리 모달에 "종료된 반복 할일" 복구 섹션 / 기간 테스크 매일 표시(`taskVisibleOnDate` 헬퍼) / dead code(`renderManageRoutines`, `manageTab`) 제거 / `taskOrder` 구조 `{ds:{slot:[ids]}}`로 재설계 + `saveTaskOrder`/`saveTaskSlotOrder` setter / 비로그인·클라우드 데이터 충돌 시 merge-sheet 재활용("이 기기 vs 클라우드") / 전체 초기화 시 `dailySortMode` 보존 / 반복 할일 수정에 "오늘부터 변경" 옵션 추가. **Low 2건**: dead CSS `.app.weekly-active` 제거 / PWA 설치 프롬프트(`beforeinstallprompt`) + 설정 모달 "홈 화면에 추가" 버튼. [public/index.html](public/index.html) 리다이렉트 방향 반전(→ `jinsplanner.web.app`). SW 캐시 `v20` → `v21` |
 | **2026-04-24** | 할 일 등록 UX 개선 4건 | `e17f341` | (1) 테스크 종료일 미설정 → 시작일과 동일하게 자동 설정 (2) 하루짜리(시작일=종료일) + 시간 미설정 테스크 → 해당일 **09:00 자동 알림** (`pickTaskSchedule` 헬퍼로 네이티브·브라우저 경로 공통화, `isNotifPast`로 과거 시각 필터) (3) "+ 할 일 추가" 시 Daily 뷰 현재 날짜를 시작일 디폴트로 (루틴·테스크 공통, 다른 탭은 오늘) (4) 종료일 < 시작일 입력 시 alert 차단 (루틴·테스크 submit 양쪽) |
+| **2026-05-04** | 스트릭·타임스탬프·카드 레이아웃 개선 (단일 커밋) | `62e7cd6` | **스트릭 표시(옵트인)**: 루틴 모달에 `enableStreak` 토글 / 카드 우측 `🔥N` 뱃지 / `computeStreak()` — 오늘부터 거꾸로 가며 카운트, `excludedDates`·미예정일은 카운팅 제외하되 스트릭 안 끊음, 오늘 미체크여도 어제까지 연속이면 유지 / 기존 루틴에 켤 때 "오늘부터 / 전체" 적용 범위 시트(`streakStartDate` 결정) / 체크 시 1~10일은 매일·이후 10일마다 응원 토스트(`STREAK_MESSAGES` + 폴백, 2.2초 자동 닫힘). **완료 시각 기록(옵트인)**: 루틴별 `recordCompletionTime` 토글 / `toggleCheck`에서 ON+당일 시 `checks[ds][rid] = "HH:MM"` 저장 / 카드 우측 `✓HH:MM` 칩 / 탭 시 시간 편집 시트(`openEditCheckTime`). **카드 레이아웃**: 카테고리 뱃지를 윗줄(`routine-cat-label` — 컬러 작은 텍스트, 배경 없음)로 이동 → 우측은 `[✓HH:MM][🔥N][😴][✏️]` 항상 ✏️ 끝, 정렬 일관성 확보. routine·task·overdue·urgent 카드 모두 적용. **기타**: 시작일 onchange로 종료일 자동 보정(`add-start-date`/`add-task-start-date`) / 건너뛰기 UX 🚫→😴, "오늘만 이 항목을 숨길까요?"→"오늘은 쉴까요? 😴" / `saveChecks` 자동 정리 한도 120→1000 (Firestore 1MB 한계 대비 ~15%). **일회성 마이그레이션**: `migrateRunningStreak()` — jinaida.k 계정 '공복 러닝' 루틴에 2026-01-19부터 주중 체크 자동 추가 (이메일 가드 + `_migrated_running_streak` 플래그로 재실행 차단, `excludedDates`/이미 체크된 날 스킵, `saveChecks` 우회로 자르기 회피). SW 캐시 `v21` → `v27` (5회 배포). |
